@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notice Board | SEC CSE Batch 2026</title>
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('theme');
+    if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (t === 'dark') document.documentElement.classList.add('dark-mode');
+  } catch (e) {}
+})();
+</script>
+<style>html.dark-mode{background:#0d1320}</style>
+<link rel="stylesheet" href="style1.css">
+<script src="notices-data.js" defer></script>
+<script src="script.js" defer></script>
+<script type="module" src="firebase-config.js"></script>
+</head>
+<body>
+      
+<!-- TOP BAR -->
+<div class="sticky-head">
+<div class="top-bar">
+  <span class="sr-only">Sylhet Engineering College || Department of Computer Science &amp; Engineering || Batch 2026 Official Page</span>
+  <div class="top-bar-marquee" aria-hidden="true">
+    <div class="top-bar-track">
+      <!-- Text is filled by script.js — edit TOP_BAR_TEXT at the top of script.js -->
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <div class="uni-seal"> SEC <br>CSE</div>
+    <div class="header-text">
+      <h1>Department of Computer Science & Engineering</h1>
+      <p>Batch 2026 &mdash; Official Student Page &nbsp;&bull;&nbsp; Session 2026–2030</p>
+    </div>
+  </div>
+</header>
+
+        <!-- NAV -->
+<nav>
+  <ul>
+     <li><a href="index.html">Home</a></li>
+    <li><a href="member.html">Members</a></li>
+    <li><a href="gallery.html">Gallery</a></li>
+    <li><a href="notice.html" class="active">Notice Board</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+</nav>
+</div>
+<!-- NOTICES -->
+<div id="notices">
+  <div class="section">
+    <div class="section-header">
+      <h3 class="js-typing">Notice Board</h3>
+      <span class="tag">Updates</span>
+    </div>
+
+    <p class="members-intro">
+    
+    </p>
+
+    <div class="notices-grid">
+      <!-- Notices are rendered by script.js from the shared NoticeStore (notices-data.js).
+           Edit notices in admin.html — this list and the Home Page update automatically. -->
+      <div class="notice-list" data-notices></div>
+
+      <div class="upcoming-card" data-reveal>
+        <h4>⏰ Upcoming Events</h4>
+
+        <div class="upcoming-event">
+          <div class="event-dot"></div>
+          <div class="event-info">
+            <strong>CSE Sport</strong>
+            <span> August 26, 2026 </span>
+          </div>
+        </div>
+
+        
+
+        <div class="upcoming-event">
+          <div class="event-dot"></div>
+          <div class="event-info">
+            <strong>Picnic</strong>
+            <span>Septembar 02, 2026</span>
+          </div>
+        </div>
+
+        
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div><strong> SEC CSE Batch 2026</strong> &mdash; Department of Computer Science &amp; Engineering</div>
+  <div class="footer-rule"></div>
+  <div>© Built with pride by Batch &rsquo;19 &nbsp;&bull;&nbsp; Session 2026&ndash;2030</div>
+  <nav class="footer-legal" aria-label="Legal and information">
+    <a href="privacy.html">Privacy Policy</a>
+    <span class="sep" aria-hidden="true">&bull;</span>
+    <a href="terms.html">Terms &amp; Conditions</a>
+    <span class="sep" aria-hidden="true">&bull;</span>
+    <a href="disclaimer.html">Disclaimer</a>
+  </nav>
+</footer>
+
+    </body>
+</html>

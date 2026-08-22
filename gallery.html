@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Photo gallery of CSE Batch 2026 — Department of Computer Science & Engineering, Sylhet Engineering College.">
+<title>Gallery | SEC CSE Batch 2026</title>
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('theme');
+    if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (t === 'dark') document.documentElement.classList.add('dark-mode');
+  } catch (e) {}
+})();
+</script>
+<style>html.dark-mode{background:#0d1320}</style>
+<link rel="stylesheet" href="style1.css">
+<script src="script.js" defer></script>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="sticky-head">
+<div class="top-bar">
+  <span class="sr-only">Sylhet Engineering College || Department of Computer Science &amp; Engineering || Batch 2026 Official Page</span>
+  <div class="top-bar-marquee" aria-hidden="true">
+    <div class="top-bar-track">
+      <!-- Text is filled by script.js — edit TOP_BAR_TEXT at the top of script.js -->
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <div class="uni-seal"> SEC <br>CSE</div>
+    <div class="header-text">
+      <h1>Department of Computer Science & Engineering</h1>
+      <p>Batch 2026 &mdash; Official Student Page &nbsp;&bull;&nbsp; Session 2026–2030</p>
+    </div>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav>
+  <ul>
+     <li><a href="index.html">Home</a></li>
+    <li><a href="member.html">Members</a></li>
+    <li><a href="gallery.html" class="active">Gallery</a></li>
+    <li><a href="notice.html">Notice Board</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+</nav>
+</div>
+
+<!-- GALLERY -->
+<div id="gallery" class="gallery-bg">
+  <div class="gallery-inner">
+    <div class="gallery-header">
+      <h3 class="js-typing">Photo Gallery</h3>
+      <span class="tag">Memories</span>
+    </div>
+
+    <p class="members-intro">
+      Moments that made our journey unforgettable &mdash; convocations, contests, tours,
+      celebrations and everyday campus life. Click any tile to view it up close.
+    </p>
+
+    <div class="gallery-grid">
+
+      <div class="gallery-item" data-category="events" data-reveal>
+        <span class="gallery-emoji">&#127891;</span>
+        <div class="gallery-caption">Convocation 2026</div>
+      </div>
+
+      <div class="gallery-item" data-category="contests" data-reveal>
+        <span class="gallery-emoji">&#127942;</span>
+        <div class="gallery-caption">Programming Contest</div>
+      </div>
+
+      <div class="gallery-item" data-category="contests" data-reveal>
+        <span class="gallery-emoji">&#128187;</span>
+        <div class="gallery-caption">Hackathon 2026</div>
+      </div>
+
+      <div class="gallery-item" data-category="contests" data-reveal>
+        <span class="gallery-emoji">&#128444;&#65039;</span>
+        <div class="gallery-caption">Project Showcase</div>
+      </div>
+
+      <div class="gallery-item" data-category="events" data-reveal>
+        <span class="gallery-emoji">&#127881;</span>
+        <div class="gallery-caption">Batch Party</div>
+      </div>
+
+      <div class="gallery-item" data-category="events" data-reveal>
+        <span class="gallery-emoji">&#9917;</span>
+        <div class="gallery-caption">Sports Week</div>
+      </div>
+
+      <div class="gallery-item" data-category="events" data-reveal>
+        <span class="gallery-emoji">&#127908;</span>
+        <div class="gallery-caption">Cultural Night</div>
+      </div>
+
+      <div class="gallery-item" data-category="events" data-reveal>
+        <span class="gallery-emoji">&#128681;</span>
+        <div class="gallery-caption">Freshers&rsquo; Rally</div>
+      </div>
+
+      <div class="gallery-item" data-category="tours" data-reveal>
+        <span class="gallery-emoji">&#127956;&#65039;</span>
+        <div class="gallery-caption">Study Tour &mdash; Sajek</div>
+      </div>
+
+      <div class="gallery-item" data-category="tours" data-reveal>
+        <span class="gallery-emoji">&#128652;</span>
+        <div class="gallery-caption">Industrial Tour</div>
+      </div>
+
+      <div class="gallery-item" data-category="campus" data-reveal>
+        <span class="gallery-emoji">&#128218;</span>
+        <div class="gallery-caption">Library Sessions</div>
+      </div>
+
+      <div class="gallery-item" data-category="campus" data-reveal>
+        <span class="gallery-emoji">&#129514;</span>
+        <div class="gallery-caption">Lab &amp; Practical Classes</div>
+      </div>
+
+      <div class="gallery-item" data-category="campus" data-reveal>
+        <span class="gallery-emoji">&#127769;</span>
+        <div class="gallery-caption">Late Night Coding</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div><strong> SEC CSE Batch 2026</strong> &mdash; Department of Computer Science &amp; Engineering</div>
+  <div class="footer-rule"></div>
+  <div>© Built with pride by Batch &rsquo;19 &nbsp;&bull;&nbsp; Session 2026&ndash;2030</div>
+  <nav class="footer-legal" aria-label="Legal and information">
+    <a href="privacy.html">Privacy Policy</a>
+    <span class="sep" aria-hidden="true">&bull;</span>
+    <a href="terms.html">Terms &amp; Conditions</a>
+    <span class="sep" aria-hidden="true">&bull;</span>
+    <a href="disclaimer.html">Disclaimer</a>
+  </nav>
+</footer>
+
+
+    </body>
+</html>

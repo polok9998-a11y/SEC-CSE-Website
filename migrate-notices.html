@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Notice Migration | SEC CSE Batch 2026</title>
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('theme');
+    if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (t === 'dark') document.documentElement.classList.add('dark-mode');
+  } catch (e) {}
+})();
+</script>
+<style>html.dark-mode{background:#0d1320}</style>
+<link rel="stylesheet" href="style1.css">
+<script src="notices-data.js" defer></script>
+<script src="script.js" defer></script>
+<script type="module" src="firebase-config.js"></script>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="sticky-head">
+<div class="top-bar">
+  <span class="sr-only">Sylhet Engineering College || Department of Computer Science &amp; Engineering || Batch 2026 Official Page</span>
+  <div class="top-bar-marquee" aria-hidden="true">
+    <div class="top-bar-track">
+      <!-- Text is filled by script.js — edit TOP_BAR_TEXT at the top of script.js -->
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <div class="uni-seal"> SEC <br>CSE</div>
+    <div class="header-text">
+      <h1>Department of Computer Science & Engineering</h1>
+      <p>Batch 2026 &mdash; Official Student Page &nbsp;&bull;&nbsp; Session 2026–2030</p>
+    </div>
+  </div>
+</header>
+
+        <!-- NAV -->
+<nav>
+  <ul>
+     <li><a href="index.html">Home</a></li>
+    <li><a href="member.html">Members</a></li>
+    <li><a href="gallery.html">Gallery</a></li>
+    <li><a href="notice.html">Notice Board</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+</nav>
+</div>
+
+<!-- MIGRATION TOOL -->
+<div id="notices">
+  <div class="section">
+    <div class="section-header">
+      <h3 class="js-typing">One-Time Notice Migration</h3>
+      <span class="tag">Setup</span>
+    </div>
+
+    <p class="members-intro">
+      This page copies the original 4 notices into Firestore once. After this,
+      Firestore is the single source of truth for every device.
+      Running it again is safe &mdash; notices that already exist are skipped,
+      never duplicated.
+    </p>
+
+    <p id="mig-setup-warning" class="admin-status error" hidden></p>
+
+    <div class="admin-grid">
+
+      <!-- STEP 1: SIGN IN -->
+      <div class="admin-card">
+        <h4>Step 1 &mdash; Admin Sign In</h4>
+
+        <p id="mig-auth-status" class="admin-status" role="status" aria-live="polite"></p>
+
+        <form id="mig-login-form" novalidate>
+          <div class="admin-field">
+            <label for="mig-email">Email</label>
+            <input type="email" id="mig-email" autocomplete="username" required>
+          </div>
+          <div class="admin-field">
+            <label for="mig-password">Password</label>
+            <input type="password" id="mig-password" autocomplete="current-password" required>
+          </div>
+          <div class="admin-actions">
+            <button type="submit" class="btn btn-gold" id="mig-login-submit">Sign In</button>
+            <button type="button" class="btn btn-outline" id="mig-signout" hidden>Sign Out</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- STEP 2: RUN MIGRATION -->
+      <div class="admin-card">
+        <h4>Step 2 &mdash; Run Migration</h4>
+
+        <p id="mig-run-status" class="members-intro" style="margin-bottom:16px">
+          Sign in as the admin to enable the migration button.
+        </p>
+
+        <div class="admin-actions">
+          <button type="button" class="btn btn-gold" id="mig-start" disabled>Migrate 4 Notices</button>
+        </div>
+
+        <div id="mig-log"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div><strong> SEC CSE Batch 2026</strong> &mdash; Department of Computer Science &amp; Engineering</div>
+  <div class="footer-rule"></div>
+  <div>© Built with pride by Batch &rsquo;19 &nbsp;&bull;&nbsp; Session 2026&ndash;2030</div>
+</footer>
+
+<script type="module">
+(async function () {
+  const loginForm = document.getElementById('mig-login-form');
+  const emailEl = document.getElementById('mig-email');
+  const passwordEl = document.getElementById('mig-password');
+  const loginSubmitBtn = document.getElementById('mig-login-submit');
+  const signOutBtn = document.getElementById('mig-signout');
+  const authStatusEl = document.getElementById('mig-auth-status');
+  const runStatusEl = document.getElementById('mig-run-status');
+  const startBtn = document.getElementById('mig-start');
+  const logEl = document.getElementById('mig-log');
+  const setupWarning = document.getElementById('mig-setup-warning');
+
+  // ── wait for firebase-config.js (dynamic SDK import is async) ──
+  const fb = await new Promise((resolve, reject) => {
+    const existing = window.NoticeFirebase;
+    if (existing && existing.ready) return resolve(existing);
+    if (existing && existing.ready === false) return reject(new Error(existing.error || 'not configured'));
+    let done = false;
+    const ok = () => { if (!done) { done = true; resolve(window.NoticeFirebase); } };
+    const bad = () => { if (!done) { done = true; reject(new Error((window.NoticeFirebase && window.NoticeFirebase.error) || 'unavailable')); } };
+    setTimeout(bad, 20000);
+    document.addEventListener('noticefirebase:ready', ok);
+    document.addEventListener('noticefirebase:failed', bad);
+  }).catch(err => {
+    setupWarning.hidden = false;
+    setupWarning.textContent =
+      'Firebase is not available (' + err.message + '). Finish the steps in FIREBASE-SETUP.md first.';
+    runStatusEl.textContent = '';
+    loginForm.hidden = true;
+    return null;
+  });
+
+  if (!fb) return;
+
+  function setAuthStatus(message, isError) {
+    authStatusEl.textContent = message || '';
+    authStatusEl.classList.toggle('error', !!isError);
+    authStatusEl.style.display = message ? 'block' : 'none';
+  }
+
+  function friendlyAuthError(err) {
+    switch (err && err.code) {
+      case 'auth/invalid-email': return 'Please enter a valid email address.';
+      case 'auth/user-not-found':
+      case 'auth/wrong-password':
+      case 'auth/invalid-credential': return 'Incorrect email or password.';
+      case 'auth/too-many-requests': return 'Too many attempts. Please wait a moment and try again.';
+      case 'auth/network-request-failed': return 'Network problem. Check your internet connection.';
+      default: return 'Sign-in failed. Please try again.';
+    }
+  }
+
+  fb.authApi.onAuthStateChanged(fb.auth, user => {
+    const authorized = user && fb.isAdminUid(user.uid);
+    loginForm.hidden = !!user;
+    signOutBtn.hidden = !user;
+    startBtn.disabled = !authorized;
+    if (!authorized) {
+      runStatusEl.textContent = user
+        ? 'Signed in account is not the configured admin. Sign in with the admin account.'
+        : 'Sign in as the admin to enable the migration button.';
+    } else {
+      runStatusEl.textContent = 'Ready. Click the button to copy the 4 original notices into Firestore.';
+    }
+  });
+
+  loginForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const email = emailEl.value.trim();
+    const password = passwordEl.value;
+    if (!email || !password) { setAuthStatus('Enter your email and password.', true); return; }
+    loginSubmitBtn.disabled = true;
+    setAuthStatus('Signing in\u2026', false);
+    fb.authApi.signInWithEmailAndPassword(fb.auth, email, password)
+      .then(() => { loginForm.reset(); setAuthStatus(''); })
+      .catch(err => setAuthStatus(friendlyAuthError(err), true))
+      .finally(() => { loginSubmitBtn.disabled = false; });
+  });
+
+  signOutBtn.addEventListener('click', () => {
+    fb.authApi.signOut(fb.auth).catch(() => setAuthStatus('Could not sign out. Please try again.', true));
+  });
+
+  startBtn.addEventListener('click', async () => {
+    startBtn.disabled = true;
+    logEl.textContent = '';
+    const seeds = (window.NoticeStore && window.NoticeStore.SEED_NOTICES) || [];
+    let created = 0, skipped = 0, failed = 0;
+
+    function log(text, isError) {
+      const p = document.createElement('p');
+      p.className = isError ? 'no-result admin-status error' : 'no-result';
+      p.style.textAlign = 'left';
+      p.style.display = 'block';
+      p.textContent = text;
+      logEl.appendChild(p);
+    }
+
+    for (const seed of seeds) {
+      const id = window.NoticeStore.makeStableId(seed);
+      const ref = fb.fs.doc(fb.db, fb.COLLECTION, id);
+      try {
+        const snap = await fb.fs.getDoc(ref);
+        if (snap.exists()) {
+          skipped++;
+          log('Skipped (already exists): [' + id + '] ' + seed.title + ' \u2014 ' + seed.date);
+          continue;
+        }
+        await fb.fs.setDoc(ref, Object.assign({}, seed, {
+          id: id,
+          createdAt: fb.fs.serverTimestamp(),
+          updatedAt: fb.fs.serverTimestamp()
+        }));
+        created++;
+        log('Added: [' + id + '] ' + seed.title + ' \u2014 ' + seed.date);
+      } catch (err) {
+        failed++;
+        const reason = err && err.code === 'permission-denied'
+          ? 'permission denied (check firestore.rules and that you replaced YOUR_ADMIN_UID)'
+          : ((err && err.message) || 'unknown error');
+        log('FAILED: [' + id + '] ' + seed.title + ' \u2014 ' + seed.date + ' (' + reason + ')', true);
+      }
+    }
+
+    log('Done. Added: ' + created + ' \u00b7 Skipped: ' + skipped + ' \u00b7 Failed: ' + failed);
+    if (created > 0) {
+      log('Firestore is now the source of truth. The Home Page and Notice Board update automatically.');
+    }
+    startBtn.disabled = false;
+  });
+})();
+</script>
+
+</body>
+</html>

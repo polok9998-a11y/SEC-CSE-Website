@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Official student page of CSE Batch 2026 — Department of Computer Science & Engineering, Sylhet Engineering College. Session 2026–2030.">
+<title> SEC CSE Batch 2026 | Department of Computer Science & Engineering</title>
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('theme');
+    if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (t === 'dark') document.documentElement.classList.add('dark-mode');
+  } catch (e) {}
+})();
+</script>
+<style>html.dark-mode{background:#0d1320}</style>
+<link rel="stylesheet" href="style1.css">
+<script src="notices-data.js" defer></script>
+<script src="script.js" defer></script>
+<script type="module" src="firebase-config.js"></script>
+</head>
+<body>
+
+<div class="sticky-head">
+<!-- TOP BAR -->
+<div class="top-bar">
+  <span class="sr-only">Sylhet Engineering College || Department of Computer Science &amp; Engineering || Batch 2026 Official Page</span>
+  <div class="top-bar-marquee" aria-hidden="true">
+    <div class="top-bar-track">
+      <!-- Text is filled by script.js — edit TOP_BAR_TEXT at the top of script.js -->
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <div class="uni-seal"> SEC <br>CSE</div>
+    <div class="header-text">
+      <h1>Department of Computer Science & Engineering</h1>
+      <p>Batch 2026 &mdash; Official Student Page &nbsp;&bull;&nbsp; Session 2026–2030</p>
+    </div>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav>
+  <ul>
+     <li><a href="index.html" class="active">Home</a></li>
+    <li><a href="member.html">Members</a></li>
+    <li><a href="gallery.html">Gallery</a></li>
+    <li><a href="notice.html">Notice Board</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+</nav>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-content">
+    <div class="hero-badge">CSE Batch &rsquo;19</div>
+    <h2 class="js-typing">One Batch. <span>One Legacy.</span></h2>
+    <p class="hero-quote">
+      <span class="sr-only">Student motivation:</span>
+      <span id="typed-quote" aria-hidden="true">"Learn Today, Lead Tomorrow."</span><span class="type-caret" aria-hidden="true"></span>
+    </p>
+    <div class="hero-stats">
+      <div class="stat-item">
+        <div class="stat-num">67</div>
+        <div class="stat-label">Students</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">4</div>
+        <div class="stat-label">Years Together</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">2030</div>
+        <div class="stat-label">Graduation Year</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ABOUT -->
+<div id="about">
+  <div class="section">
+    <div class="section-header">
+      <h3 class="js-typing">About the Batch</h3>
+      <span class="tag">Who We Are</span>
+    </div>
+
+    <div class="about-grid">
+      <div class="about-text" data-reveal>
+        <p>
+          <strong>Welcome to the official home of CSE Batch 2026.</strong>
+          We are a family of 67 students of the Department of Computer Science &amp; Engineering
+          at Sylhet Engineering College, united by one dream &mdash; to learn, grow and lead in the
+          world of technology.
+        </p>
+        <p>
+          From late-night coding sessions to exam-week struggles, from freshers' rally to project
+          showcases &mdash; every moment of our four-year journey lives on this page. This website is
+          built and maintained by the students themselves, as a record of our friendship, our
+          achievements and our legacy.
+        </p>
+        <p>
+          Explore our members, relive our memories in the gallery, stay updated with the notice
+          board, and reach out anytime &mdash; this batch is always stronger together.
+        </p>
+        <a href="member.html" class="btn btn-outline">Meet the Members</a>
+      </div>
+
+      <aside class="about-facts" data-reveal>
+        <h4>Batch at a Glance</h4>
+        <ul class="fact-list">
+          <li><span>College</span><strong>Sylhet Engineering College</strong></li>
+          <li><span>Department</span><strong>Computer Science &amp; Engineering</strong></li>
+          <li><span>Session</span><strong>2026 &ndash; 2030</strong></li>
+          <li><span>Students</span><strong>67 Future Engineers</strong></li>
+          <li><span>Motto</span><strong>&ldquo;Learn Today, Lead Tomorrow.&rdquo;</strong></li>
+        </ul>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<!-- HIGHLIGHTS -->
+<div id="highlights" class="gallery-bg">
+  <div class="gallery-inner">
+    <div class="gallery-header">
+      <h3 class="js-typing">Why Our Batch</h3>
+      <span class="tag">Highlights</span>
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature-card" data-reveal>
+        <div class="feature-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.66 2.69 3 6 3s6-1.34 6-3v-5"/></svg>
+        </div>
+        <h4>Academic Excellence</h4>
+        <p>A strong foundation in programming, algorithms and modern computing, guided by dedicated teachers.</p>
+      </div>
+
+      <div class="feature-card" data-reveal>
+        <div class="feature-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <h4>Unity &amp; Teamwork</h4>
+        <p>67 students, one family. We study together, help each other and celebrate every success side by side.</p>
+      </div>
+
+      <div class="feature-card" data-reveal>
+        <div class="feature-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3a1 1 0 0 1 1 1c0 2-2 4-4 4"/><path d="M7 5H4a1 1 0 0 0-1 1c0 2 2 4 4 4"/></svg>
+        </div>
+        <h4>Events &amp; Contests</h4>
+        <p>Programming contests, tech fests, sports and cultural events &mdash; we participate, we host, we win.</p>
+      </div>
+
+      <div class="feature-card" data-reveal>
+        <div class="feature-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        </div>
+        <h4>Career Ready</h4>
+        <p>Real-world projects, industrial training and alumni guidance prepare us for jobs and higher study.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JOURNEY -->
+<div id="journey">
+  <div class="section">
+    <div class="section-header">
+      <h3 class="js-typing">Our Journey</h3>
+      <span class="tag">2026 &ndash; 2030</span>
+    </div>
+
+    <div class="timeline">
+      <div class="timeline-item" data-reveal>
+        <div class="timeline-year">2026</div>
+        <div class="timeline-content">
+          <h4>A New Beginning</h4>
+          <p>Admission, orientation and the first hello. 67 strangers step into Sylhet Engineering College and become one batch.</p>
+        </div>
+      </div>
+
+      <div class="timeline-item" data-reveal>
+        <div class="timeline-year">2027</div>
+        <div class="timeline-content">
+          <h4>Building Foundations</h4>
+          <p>Programming fundamentals, mathematics, digital logic and electrical basics &mdash; the first all-nighters before exams begin.</p>
+        </div>
+      </div>
+
+      <div class="timeline-item" data-reveal>
+        <div class="timeline-year">2028</div>
+        <div class="timeline-content">
+          <h4>Core Computer Science</h4>
+          <p>Data structures, algorithms, databases and operating systems &mdash; plus our first real team projects and hackathons.</p>
+        </div>
+      </div>
+
+      <div class="timeline-item" data-reveal>
+        <div class="timeline-year">2029</div>
+        <div class="timeline-content">
+          <h4>Specialization &amp; Industry</h4>
+          <p>Advanced electives like AI, machine learning and networks, along with industrial attachment and internship experience.</p>
+        </div>
+      </div>
+
+      <div class="timeline-item" data-reveal>
+        <div class="timeline-year">2030</div>
+        <div class="timeline-content">
+          <h4>Graduation &amp; Beyond</h4>
+          <p>Final year project, thesis defense and farewell &mdash; then we spread out into careers and higher studies, carrying our legacy forward.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LATEST NOTICES -->
+<div id="latest-notices" class="gallery-bg">
+  <div class="gallery-inner">
+    <div class="gallery-header">
+      <h3 class="js-typing">Latest Notices</h3>
+      <span class="tag">Notice Board</span>
+    </div>
+
+    <!-- Latest 3 notices, rendered by script.js from the shared NoticeStore (notices-data.js).
+         Add/edit/delete notices in admin.html and this list updates automatically. -->
+    <div class="notice-list home-notices" data-notices data-notices-limit="3"></div>
+
+    <a href="notice.html" class="btn btn-outline">View All Notices</a>
+  </div>
+</div>
+
+<!-- EXPLORE -->
+<div id="explore">
+  <div class="section">
+    <div class="section-header">
+      <h3 class="js-typing">Explore</h3>
+      <span class="tag">Quick Links</span>
+    </div>
+
+    <div class="explore-grid">
+      <a class="explore-card" href="member.html" data-reveal>
+        <div class="explore-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <h4>Members</h4>
+        <p>All 67 students of the batch, with roles and roll numbers.</p>
+        <span class="explore-link">View Members</span>
+      </a>
+
+      <a class="explore-card" href="gallery.html" data-reveal>
+        <div class="explore-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        </div>
+        <h4>Gallery</h4>
+        <p>Moments, events and memories from our journey together.</p>
+        <span class="explore-link">Open Gallery</span>
+      </a>
+
+      <a class="explore-card" href="notice.html" data-reveal>
+        <div class="explore-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <h4>Notice Board</h4>
+        <p>Exams, events and important announcements in one place.</p>
+        <span class="explore-link">Read Notices</span>
+      </a>
+
+      <a class="explore-card" href="contact.html" data-reveal>
+        <div class="explore-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg>
+        </div>
+        <h4>Contact</h4>
+        <p>Reach out to the class representatives for anything at all.</p>
+        <span class="explore-link">Get in Touch</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- CTA -->
+<div class="cta-band">
+  <div class="cta-inner">
+    <h3>One Batch. <span>One Family.</span></h3>
+    <p>Get to know the 67 students who make CSE Batch 2026 special.</p>
+    <div class="cta-actions">
+      <a href="member.html" class="btn btn-gold">Meet the Batch</a>
+      <a href="gallery.html" class="btn btn-ghost">View Gallery</a>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div><strong> SEC CSE Batch 2026</strong> &mdash; Department of Computer Science &amp; Engineering</div>
+  <div class="footer-rule"></div>
+  <div> Built with pride by Batch &rsquo;19 &nbsp;&bull;&nbsp; Session 2026&ndash;2030</div>
+  <div id="polok">© Page created by <a href="">Polok Chandra Sarker</a></div>
+  <nav class="footer-legal" aria-label="Legal and information">
+    <a href="privacy.html">Privacy Policy</a>
+    <span class="sep" aria-hidden="true">&bull;</span>
+    <a href="terms.html">Terms &amp; Conditions</a>
+    <span class="sep" aria-hidden="true">&bull;</span>
+    <a href="disclaimer.html">Disclaimer</a>
+  </nav>
+</footer>
+</body>
+</html>
