@@ -107,12 +107,16 @@ Do not change anything below the marked line in that file.
 
 ## I. Put the UID into the configuration and rules
 
-Replace `YOUR_ADMIN_UID` in **two files**:
+Replace `YOUR_ADMIN_UID` in **two files** (keep them in sync):
 
 1. `firebase-config.js` → in the `ADMIN_UIDS` list.
    (This only controls which account sees the Admin Panel UI.)
-2. `firestore.rules` → inside `function isAdmin()`.
+2. `firestore.rules` → inside the list in `function isAdmin()`.
    (This is the REAL security boundary.)
+
+To give extra people admin rights later, add their UIDs as new lines in
+**both** lists — anyone not listed cannot write, even with a valid
+Firebase account.
 
 ## J. Create the Firestore Database
 
@@ -271,6 +275,12 @@ In `firebase-config.js`:
 - [ ] `YOUR_ADMIN_UID` (inside `ADMIN_UIDS`)
 
 In `firestore.rules`:
-- [ ] `YOUR_ADMIN_UID` (inside `isAdmin()`)
+- [ ] `YOUR_ADMIN_UID` (inside the list in `isAdmin()`)
 
 After replacing everything, run the steps L → Q once more.
+
+> **Security checklist:** admin.html and firebase-config.js stay in the
+> repository on purpose — the Web config is not a secret. Security comes
+> only from Authentication + the deployed firestore.rules, so make sure
+> the rules are published with your real UID (step K) before going live.
+> Never add passwords, private keys or service-account files to this repo.

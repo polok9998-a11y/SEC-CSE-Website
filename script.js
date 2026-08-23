@@ -788,6 +788,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const userEmailEl = document.getElementById('admin-user-email');
     const logoutBtn = document.getElementById('admin-logout');
 
+    // UID of the signed-in account while it is an authorized admin,
+    // otherwise null. This is a FAST client-side guard only — the real
+    // enforcement happens in firestore.rules on Google's servers.
+    let signedInAdminUid = null;
+
+    // Fail-fast check used before every write request. Fails closed:
+    // until Firebase Auth confirms an authorized admin, nothing is sent.
+    function requireAdminSignIn() {
+      if (signedInAdminUid) return true;
+      setStatus('Please sign in as the admin first.', true);
+      return false;
+    }
+
     // Waits for firebase-config.js to finish loading the SDK.
     function whenFirebaseReady(timeoutMs) {
       return new Promise((resolve, reject) => {
@@ -829,6 +842,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     adminForm.addEventListener('submit', e => {
       e.preventDefault();
+      if (!requireAdminSignIn()) return;
       const data = {
         title: adminFields.title.value.trim(),
         details: adminFields.details.value.trim(),
@@ -867,6 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const id = row.dataset.id;
 
       if (e.target.classList.contains('delete')) {
+        if (!requireAdminSignIn()) return;
         if (window.confirm('Delete this notice permanently?')) {
           if (adminFields.id.value === id) resetForm();
           e.target.disabled = true;
@@ -981,6 +996,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyAuthState(fb, user) {
+      // Keep the write-guard in sync with the real auth state.
+      signedInAdminUid = (user && fb.isAdminUid(user.uid)) ? user.uid : null;
       if (!user) {
         showView('login');
         setAuthStatus('');
@@ -1061,6 +1078,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const gStatusEl = document.getElementById('g-status');
     const gList = document.getElementById('gallery-admin-list');
 
+    // Client-side fail-fast guard for gallery writes — mirrors the notice
+    // panel guard above. Real enforcement lives in firestore.rules.
+    let signedInGalleryAdmin = false;
+
+    function requireGalleryAdminSignIn() {
+      if (signedInGalleryAdmin) return true;
+      setGalleryStatus('Please sign in as the admin first.', true);
+      return false;
+    }
+
+    // Watches Firebase Auth state once firebase-config.js finishes loading
+    // the SDK. Fails closed: while nobody (or a non-admin) is signed in,
+    // every gallery write is blocked locally before any request is sent.
+    function watchGalleryAuth() {
+      const fb = window.NoticeFirebase;
+      if (!fb || !fb.ready) {
+        document.addEventListener('noticefirebase:ready', function onReady() {
+          document.removeEventListener('noticefirebase:ready', onReady);
+          watchGalleryAuth();
+        });
+        return;
+      }
+      fb.authApi.onAuthStateChanged(fb.auth, user => {
+        signedInGalleryAdmin = !!user && fb.isAdminUid(user.uid);
+      });
+    }
+    watchGalleryAuth();
+
     function setGalleryStatus(message, isError) {
       gStatusEl.textContent = message;
       gStatusEl.classList.toggle('error', !!isError);
@@ -1102,6 +1147,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     galleryForm.addEventListener('submit', e => {
       e.preventDefault();
+      if (!requireGalleryAdminSignIn()) return;
       const result = readGalleryForm();
       if (result.error) {
         setGalleryStatus(result.error, true);
@@ -1135,6 +1181,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const id = row.dataset.id;
 
       if (e.target.classList.contains('delete')) {
+        if (!requireGalleryAdminSignIn()) return;
         if (window.confirm('Delete this gallery image permanently?')) {
           if (gFields.id.value === id) resetGalleryForm();
           e.target.disabled = true;
