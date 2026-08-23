@@ -1,0 +1,62 @@
+rules_version = '2';
+
+// ============================================================
+// FIRESTORE SECURITY RULES — SEC CSE Batch 2026 Notice System
+// ============================================================
+//
+// ─── WHAT YOU MUST EDIT ─────────────────────────────────────
+// Replace YOUR_ADMIN_UID below (it appears once) with the UID
+// of your Firebase Authentication admin user.
+//
+// Find it in: Firebase Console → Authentication → Users →
+// the "User UID" column of your admin account.
+//
+// These rules are the REAL security boundary for the website.
+// Do not rely on anything in the frontend JavaScript — anyone
+// can read this code. Until you replace YOUR_ADMIN_UID and
+// deploy these rules, DO NOT consider the database secure.
+//
+// How to deploy: see FIREBASE-SETUP.md (section "Deploy the
+// Security Rules").
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database} {
+
+    // Helper: true only when the request comes from your admin account.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.uid == "YOUR_ADMIN_UID";  // ← REPLACE with your admin user's UID
+    }
+
+    // The notice board collection.
+    match /notices/{noticeId} {
+
+      // PUBLIC: every visitor (even signed out) can read notices.
+      allow get: if true;
+      allow list: if true;
+
+      // ADMIN ONLY: only your authenticated admin account may
+      // create, edit/update or delete notices.
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // The public photo gallery collection.
+    match /gallery/{imageId} {
+
+      // PUBLIC: every visitor (even signed out) can view gallery images.
+      allow get: if true;
+      allow list: if true;
+
+      // ADMIN ONLY: only your authenticated admin account may
+      // create, edit/update or delete gallery images.
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Everything else is denied by default (no rule = no access).
+  }
+}

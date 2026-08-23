@@ -35,6 +35,95 @@ document.addEventListener('DOMContentLoaded', () => {
     topBarTrack.style.animationDuration = TOP_BAR_SPEED_SECONDS + 's';
   }
 
+  // ===== 0b. STICKY TOP BAR + NAV OFFSET + MOBILE HAMBURGER MENU (all pages) =====
+  // The .top-bar and nav are position:sticky in CSS. Here we only:
+  //   1) measure the pinned Top Bar height into --topbar-h so the nav parks
+  //      directly below it, and the combined pinned height into
+  //      --sticky-offset so anchor links never land underneath them,
+  //   2) wire the hamburger button on small screens.
+  const rootEl = document.documentElement;
+  const topBar = document.querySelector('.top-bar');
+  const navBar = document.querySelector('nav');
+  const navToggle = document.getElementById('nav-toggle');
+  const navMenu = document.getElementById('site-nav-menu');
+
+  const smoothOK = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const scrollBehavior = smoothOK ? 'smooth' : 'auto';
+
+  function updateStickyOffset() {
+    const topH = topBar ? topBar.offsetHeight : 0;
+    const navH = navBar ? navBar.offsetHeight : 0;
+    if (!topH && !navH) return;
+    // where the sticky nav parks: directly below the Top Bar
+    rootEl.style.setProperty('--topbar-h', topH + 'px');
+    // total pinned height: anchor scroll clearance for bar + nav
+    rootEl.style.setProperty('--sticky-offset', (topH + navH) + 'px');
+  }
+  updateStickyOffset();
+  window.addEventListener('load', updateStickyOffset);
+
+  function closeMobileNav() {
+    if (!navMenu || !navToggle) return;
+    navMenu.classList.remove('open');
+    navToggle.classList.remove('open');
+    navToggle.setAttribute('aria-expanded', 'false');
+    navToggle.setAttribute('aria-label', 'Open navigation menu');
+  }
+
+  if (navToggle && navMenu) {
+    // Collapses the link list on small screens ONLY when JS can reopen it.
+    rootEl.classList.add('js-nav');
+    updateStickyOffset();
+
+    navToggle.addEventListener('click', () => {
+      const willOpen = !navMenu.classList.contains('open');
+      navMenu.classList.toggle('open', willOpen);
+      navToggle.classList.toggle('open', willOpen);
+      navToggle.setAttribute('aria-expanded', String(willOpen));
+      navToggle.setAttribute('aria-label', willOpen ? 'Close navigation menu' : 'Open navigation menu');
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && navMenu.classList.contains('open')) {
+        closeMobileNav();
+        navToggle.focus();
+      }
+    });
+
+    // Tap/click outside the open menu closes it.
+    document.addEventListener('click', e => {
+      if (!navMenu.classList.contains('open')) return;
+      if (navToggle.contains(e.target) || navMenu.contains(e.target)) return;
+      closeMobileNav();
+    });
+
+    // Selecting a section: always close the menu; if the link points at the
+    // current page just scroll smoothly (to top or to the #target) instead
+    // of reloading — cross-page links keep working as normal page loads.
+    navMenu.addEventListener('click', e => {
+      const link = e.target.closest('a');
+      if (!link) return;
+      closeMobileNav();
+      try {
+        const target = new URL(link.href, location.href);
+        const here = new URL(location.href);
+        if (target.pathname.replace(/\/+$/, '') === here.pathname.replace(/\/+$/, '')) {
+          e.preventDefault();
+          if (target.hash && target.hash !== '#') {
+            const el = document.getElementById(decodeURIComponent(target.hash.slice(1)));
+            if (el) { el.scrollIntoView({ behavior: scrollBehavior, block: 'start' }); return; }
+          }
+          window.scrollTo({ top: 0, behavior: scrollBehavior });
+        }
+      } catch (err) { /* malformed href: let the browser handle it */ }
+    });
+  }
+
+  window.addEventListener('resize', () => {
+    updateStickyOffset();
+    if (window.innerWidth > 768) closeMobileNav();
+  });
+
   // ===== 1. BACK TO TOP BUTTON (all pages) =====
   const topBtn = document.createElement('button');
   topBtn.id = 'back-to-top';
@@ -51,8 +140,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ===== 2. GALLERY LIGHTBOX (gallery.html) =====
-  const galleryItems = document.querySelectorAll('.gallery-item');
-  if (galleryItems.length > 0) {
+  // Delegated on .gallery-grid, so it works for the Firestore-rendered
+  // items as well as any static emoji tiles.
+  const galleryGridForLightbox = document.querySelector('.gallery-grid');
+  if (galleryGridForLightbox) {
     const lightbox = document.createElement('div');
     lightbox.className = 'lightbox';
     lightbox.innerHTML =
@@ -62,16 +153,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const content = lightbox.querySelector('.lightbox-content');
 
-    galleryItems.forEach(item => {
-      item.addEventListener('click', () => {
+    galleryGridForLightbox.addEventListener('click', e => {
+      const item = e.target.closest('.gallery-item');
+      if (!item || item.classList.contains('gallery-skeleton')) return;
+
+      content.textContent = '';
+
+      const imgEl = item.querySelector('img.gallery-img');
+      if (imgEl && imgEl.getAttribute('src')) {
+        const big = document.createElement('img');
+        big.className = 'lightbox-img';
+        big.src = imgEl.getAttribute('src');
+        big.alt = imgEl.alt || '';
+        content.appendChild(big);
+      } else {
         const emojiEl = item.querySelector('.gallery-emoji');
-        const emoji = (emojiEl ? emojiEl.textContent : item.firstChild.textContent).trim();
-        const caption = item.querySelector('.gallery-caption');
-        content.innerHTML =
-          '<div class="lightbox-emoji">' + emoji + '</div>' +
-          '<p>' + (caption ? caption.textContent : '') + '</p>';
-        lightbox.classList.add('open');
-      });
+        const emoji = (emojiEl ? emojiEl.textContent : '').trim();
+        if (emoji) {
+          const em = document.createElement('div');
+          em.className = 'lightbox-emoji';
+          em.textContent = emoji;
+          content.appendChild(em);
+        }
+      }
+
+      const captionEl = item.querySelector('.gallery-caption');
+      if (captionEl && captionEl.textContent.trim()) {
+        const cap = document.createElement('p');
+        cap.textContent = captionEl.textContent;
+        content.appendChild(cap);
+      }
+
+      lightbox.classList.add('open');
     });
 
     lightbox.addEventListener('click', e => {
@@ -478,40 +591,172 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // ===== 11. GALLERY CATEGORY FILTER (gallery.html) =====
-  const galleryGrid = document.querySelector('.gallery-grid');
-  if (galleryGrid) {
-    const gItems = galleryGrid.querySelectorAll('.gallery-item[data-category]');
-    if (gItems.length > 0) {
+  // ===== 11. PUBLIC GALLERY — FIRESTORE RENDERING + FILTER (gallery.html) =====
+  // Fills [data-gallery-grid] from the shared GalleryStore (gallery-data.js).
+  // Admin adds/edits/deletes images in admin.html; this grid updates
+  // automatically through the same real-time listener.
+  const galleryGrid = document.querySelector('[data-gallery-grid]');
+  if (galleryGrid && window.GalleryStore) {
+
+    let currentFilter = 'all';
+    let galleryFilterBar = null;
+
+    function showGalleryMessage(text) {
+      const message = document.createElement('p');
+      message.className = 'no-result';
+      message.textContent = text;
+      return message;
+    }
+
+    function buildGalleryItem(photo, withReveal) {
+      const item = document.createElement('div');
+      item.className = 'gallery-item';
+      if (withReveal) item.setAttribute('data-reveal', '');
+      if (photo.category) item.dataset.category = photo.category;
+
+      const img = document.createElement('img');
+      img.className = 'gallery-img';
+      img.loading = 'lazy';
+      img.src = photo.imageUrl;
+      img.alt = photo.title || photo.caption || 'Gallery photo';
+      // Graceful fallback for invalid/broken image URLs.
+      img.addEventListener('error', () => {
+        img.remove();
+        item.classList.add('broken');
+        if (!item.querySelector('.gallery-emoji')) {
+          const fallback = document.createElement('span');
+          fallback.className = 'gallery-emoji';
+          fallback.textContent = '\u{1F5BC}\uFE0F'; // framed picture
+          item.insertBefore(fallback, item.firstChild);
+        }
+      });
+      item.appendChild(img);
+
+      const label = photo.title || photo.caption;
+      if (label) {
+        const cap = document.createElement('div');
+        cap.className = 'gallery-caption';
+        cap.textContent = label;
+        item.appendChild(cap);
+      }
+
+      return item;
+    }
+
+    // Rebuilds the category filter bar from the live data (same
+    // .filter-bar / .filter-btn design as the Notice Board).
+    function rebuildGalleryFilter(photos) {
+      if (galleryFilterBar) { galleryFilterBar.remove(); galleryFilterBar = null; }
+
       const categories = [];
-      gItems.forEach(i => {
-        if (!categories.includes(i.dataset.category)) categories.push(i.dataset.category);
+      photos.forEach(p => {
+        if (p.category && categories.indexOf(p.category) === -1) categories.push(p.category);
+      });
+      if (categories.length === 0) return;
+
+      if (categories.indexOf(currentFilter) === -1) currentFilter = 'all';
+
+      galleryFilterBar = document.createElement('div');
+      galleryFilterBar.className = 'filter-bar';
+
+      const allBtn = document.createElement('button');
+      allBtn.type = 'button';
+      allBtn.className = 'filter-btn' + (currentFilter === 'all' ? ' active' : '');
+      allBtn.dataset.filter = 'all';
+      allBtn.textContent = 'All';
+      galleryFilterBar.appendChild(allBtn);
+
+      categories.forEach(c => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'filter-btn' + (currentFilter === c ? ' active' : '');
+        btn.dataset.filter = c;
+        btn.textContent = c.charAt(0).toUpperCase() + c.slice(1);
+        galleryFilterBar.appendChild(btn);
       });
 
-      const gBar = document.createElement('div');
-      gBar.className = 'filter-bar';
-      gBar.innerHTML =
-        '<button class="filter-btn active" data-filter="all">All</button>' +
-        categories.map(c =>
-          '<button class="filter-btn" data-filter="' + c + '">' +
-          c.charAt(0).toUpperCase() + c.slice(1) +
-          '</button>'
-        ).join('');
-      galleryGrid.parentNode.insertBefore(gBar, galleryGrid);
-
-      gBar.addEventListener('click', e => {
+      galleryFilterBar.addEventListener('click', e => {
         const btn = e.target.closest('.filter-btn');
         if (!btn) return;
-
-        gBar.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-
-        const filter = btn.dataset.filter;
-        gItems.forEach(item => {
-          const match = filter === 'all' || item.dataset.category === filter;
-          item.style.display = match ? '' : 'none';
-        });
+        currentFilter = btn.dataset.filter;
+        galleryFilterBar.querySelectorAll('.filter-btn').forEach(b =>
+          b.classList.toggle('active', b === btn));
+        applyGalleryFilter();
       });
+
+      galleryGrid.parentNode.insertBefore(galleryFilterBar, galleryGrid);
+    }
+
+    function applyGalleryFilter() {
+      galleryGrid.querySelectorAll('.gallery-item').forEach(item => {
+        if (item.classList.contains('gallery-skeleton')) return;
+        const match = currentFilter === 'all' || item.dataset.category === currentFilter;
+        item.style.display = match ? '' : 'none';
+      });
+    }
+
+    // Same conditions as the scroll-reveal section — only animate when the
+    // reveal observer will actually be able to run.
+    function canAnimateReveal() {
+      return 'IntersectionObserver' in window &&
+        !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    let firstRender = true;
+    function renderPublicGallery() {
+      const status = GalleryStore.getStatus();
+      const photos = GalleryStore.getAll().filter(p => p.imageUrl);
+
+      if (status === 'loading') {
+        galleryGrid.textContent = '';
+        for (let i = 0; i < 7; i++) {
+          const skeleton = document.createElement('div');
+          skeleton.className = 'gallery-item gallery-skeleton';
+          skeleton.setAttribute('aria-hidden', 'true');
+          galleryGrid.appendChild(skeleton);
+        }
+        return;
+      }
+
+      galleryGrid.textContent = '';
+
+      if (status === 'error') {
+        galleryGrid.appendChild(showGalleryMessage('Unable to load the gallery right now. Please try again later.'));
+        rebuildGalleryFilter([]);
+        return;
+      }
+
+      if (photos.length === 0) {
+        galleryGrid.appendChild(showGalleryMessage('No photos have been added yet.'));
+        rebuildGalleryFilter([]);
+        return;
+      }
+
+      const animate = firstRender && canAnimateReveal();
+      const renderedItems = [];
+      photos.forEach(photo => {
+        const item = buildGalleryItem(photo, animate);
+        galleryGrid.appendChild(item);
+        renderedItems.push(item);
+      });
+      firstRender = false;
+
+      // Items appear after the reveal observer was created — register them
+      // for the same reveal animation as everything else.
+      if (registerRevealEls && renderedItems.length) {
+        registerRevealEls(renderedItems);
+      }
+
+      rebuildGalleryFilter(photos);
+      applyGalleryFilter();
+    }
+
+    GalleryStore.onChange(renderPublicGallery);
+
+    if (GalleryStore.getStatus() === 'ready' || GalleryStore.getStatus() === 'error') {
+      renderPublicGallery();
+    } else {
+      GalleryStore.ready().then(renderPublicGallery).catch(renderPublicGallery);
     }
   }
 
@@ -794,6 +1039,223 @@ document.addEventListener('DOMContentLoaded', () => {
     // Keeps the admin list in sync too (changes made here appear on every
     // visitor's screen instantly through Firestore real-time listeners).
     NoticeStore.onChange(renderAdminList);
+  }
+
+  // ===== 13. GALLERY ADMIN PANEL (admin.html) =====
+  // Lives inside the same #admin-panel auth gate as the notice tools, so it
+  // is only visible to the signed-in admin. Writes are additionally
+  // protected server-side by firestore.rules.
+  const galleryForm = document.getElementById('gallery-admin-form');
+  if (galleryForm && window.GalleryStore) {
+    const gFields = {
+      id: document.getElementById('g-id'),
+      url: document.getElementById('g-url'),
+      title: document.getElementById('g-title'),
+      caption: document.getElementById('g-caption'),
+      category: document.getElementById('g-category'),
+      order: document.getElementById('g-order')
+    };
+    const gHeading = document.getElementById('g-form-heading');
+    const gSubmitBtn = document.getElementById('g-submit');
+    const gCancelBtn = document.getElementById('g-cancel-edit');
+    const gStatusEl = document.getElementById('g-status');
+    const gList = document.getElementById('gallery-admin-list');
+
+    function setGalleryStatus(message, isError) {
+      gStatusEl.textContent = message;
+      gStatusEl.classList.toggle('error', !!isError);
+      gStatusEl.style.display = message ? 'block' : 'none';
+    }
+
+    function resetGalleryForm() {
+      galleryForm.reset();
+      gFields.id.value = '';
+      gHeading.textContent = 'Add Gallery Image';
+      gSubmitBtn.textContent = 'Add Image';
+      gCancelBtn.style.display = 'none';
+    }
+
+    function readGalleryForm() {
+      const data = {
+        imageUrl: gFields.url.value.trim(),
+        title: gFields.title.value.trim(),
+        caption: gFields.caption.value.trim(),
+        category: gFields.category.value.trim(),
+        order: gFields.order.value.trim()
+      };
+      if (!data.imageUrl) {
+        return { error: 'Please enter an image URL.' };
+      }
+      try {
+        const parsed = new URL(data.imageUrl);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          return { error: 'The image URL must start with http:// or https://.' };
+        }
+      } catch (e) {
+        return { error: 'That does not look like a valid image URL.' };
+      }
+      if (data.order !== '' && (!isFinite(Number(data.order)) || Number(data.order) < 0)) {
+        return { error: 'Display order must be a number of 0 or more (or left empty).' };
+      }
+      return { data: data };
+    }
+
+    galleryForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const result = readGalleryForm();
+      if (result.error) {
+        setGalleryStatus(result.error, true);
+        return;
+      }
+      const editId = gFields.id.value;
+      gSubmitBtn.disabled = true;
+      gCancelBtn.disabled = true;
+
+      const request = editId ? GalleryStore.update(editId, result.data) : GalleryStore.add(result.data);
+      request.then(() => {
+        resetGalleryForm();
+        setGalleryStatus(editId
+          ? 'Image updated. The public Gallery page is in sync.'
+          : 'Image added. It is now live on the public Gallery page.');
+      }).catch(err => {
+        let msg = GalleryStore.messageFor(err);
+        if (err && err.message === 'IMAGE_URL_REQUIRED') msg = 'Please enter an image URL.';
+        setGalleryStatus(msg, true);
+      }).finally(() => {
+        gSubmitBtn.disabled = false;
+        gCancelBtn.disabled = false;
+      });
+    });
+
+    gCancelBtn.addEventListener('click', resetGalleryForm);
+
+    gList.addEventListener('click', e => {
+      const row = e.target.closest('.admin-item');
+      if (!row) return;
+      const id = row.dataset.id;
+
+      if (e.target.classList.contains('delete')) {
+        if (window.confirm('Delete this gallery image permanently?')) {
+          if (gFields.id.value === id) resetGalleryForm();
+          e.target.disabled = true;
+          GalleryStore.remove(id)
+            .then(() => setGalleryStatus('Image deleted from the gallery.'))
+            .catch(err => {
+              setGalleryStatus(GalleryStore.messageFor(err), true);
+              e.target.disabled = false;
+            });
+        }
+        return;
+      }
+
+      if (e.target.classList.contains('edit')) {
+        const photo = GalleryStore.getAll().find(p => p.id === id);
+        if (!photo) return;
+        gFields.id.value = photo.id;
+        gFields.url.value = photo.imageUrl;
+        gFields.title.value = photo.title;
+        gFields.caption.value = photo.caption;
+        gFields.category.value = photo.category;
+        gFields.order.value = photo.order === null ? '' : photo.order;
+        gHeading.textContent = 'Edit Gallery Image';
+        gSubmitBtn.textContent = 'Update Image';
+        gCancelBtn.style.display = '';
+        setGalleryStatus('Editing "' + (photo.title || photo.imageUrl) + '".', false);
+        galleryForm.scrollIntoView({ behavior: scrollBehavior, block: 'start' });
+      }
+    });
+
+    function renderGalleryAdminList() {
+      const photos = GalleryStore.getAll();
+      const editingId = gFields.id.value;
+      const status = GalleryStore.getStatus();
+
+      gList.textContent = '';
+      if (status === 'error') {
+        const err = document.createElement('p');
+        err.className = 'no-result';
+        err.textContent = 'Unable to load the gallery right now.';
+        gList.appendChild(err);
+        return;
+      }
+      if (status === 'loading') {
+        const loading = document.createElement('p');
+        loading.className = 'no-result';
+        loading.textContent = 'Loading gallery\u2026';
+        gList.appendChild(loading);
+        return;
+      }
+      if (photos.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'no-result';
+        empty.textContent = 'No images yet. Add your first one with the form.';
+        gList.appendChild(empty);
+        return;
+      }
+
+      photos.forEach(photo => {
+        const item = document.createElement('div');
+        item.className = 'admin-item' + (photo.id === editingId ? ' editing' : '');
+        item.dataset.id = photo.id;
+
+        // thumbnail (falls back to a placeholder box for broken URLs)
+        const thumbBox = document.createElement('span');
+        thumbBox.className = 'admin-thumb-box';
+        const thumb = document.createElement('img');
+        thumb.className = 'admin-thumb';
+        thumb.loading = 'lazy';
+        thumb.alt = '';
+        thumb.src = photo.imageUrl;
+        thumb.addEventListener('error', () => {
+          thumb.remove();
+          thumbBox.textContent = '\u{1F5BC}\uFE0F';
+        });
+        thumbBox.appendChild(thumb);
+
+        const info = document.createElement('div');
+        info.className = 'admin-item-info';
+
+        const titleEl = document.createElement('strong');
+        titleEl.textContent = photo.title || '(untitled image)';
+        info.appendChild(titleEl);
+
+        const metaBits = [];
+        metaBits.push(photo.order === null ? 'No order' : 'Order ' + photo.order);
+        if (photo.category) metaBits.push(photo.category.charAt(0).toUpperCase() + photo.category.slice(1));
+        const metaEl = document.createElement('span');
+        metaEl.className = 'admin-item-date';
+        metaEl.textContent = metaBits.join(' \u00b7 ');
+        info.appendChild(metaEl);
+
+        const urlEl = document.createElement('span');
+        urlEl.className = 'admin-item-url';
+        urlEl.textContent = photo.imageUrl;
+        urlEl.title = photo.imageUrl;
+        info.appendChild(urlEl);
+
+        const actions = document.createElement('div');
+        actions.className = 'admin-item-actions';
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'admin-btn edit';
+        editBtn.textContent = 'Edit';
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'admin-btn delete';
+        deleteBtn.textContent = 'Delete';
+        actions.appendChild(editBtn);
+        actions.appendChild(deleteBtn);
+
+        item.appendChild(thumbBox);
+        item.appendChild(info);
+        item.appendChild(actions);
+        gList.appendChild(item);
+      });
+    }
+
+    renderGalleryAdminList();
+    resetGalleryForm();
+    GalleryStore.onChange(renderGalleryAdminList);
   }
 
 });

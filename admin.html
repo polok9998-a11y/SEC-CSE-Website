@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Notice Admin | SEC CSE Batch 2026</title>
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('theme');
+    if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (t === 'dark') document.documentElement.classList.add('dark-mode');
+  } catch (e) {}
+})();
+</script>
+<style>html.dark-mode{background:#0d1320}</style>
+<link rel="stylesheet" href="style1.css">
+<script src="notices-data.js" defer></script>
+<script src="gallery-data.js" defer></script>
+<script src="script.js" defer></script>
+<script type="module" src="firebase-config.js"></script>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="sticky-head">
+<div class="top-bar">
+  <span class="sr-only">Sylhet Engineering College || Department of Computer Science &amp; Engineering || Batch 2026 Official Page</span>
+  <div class="top-bar-marquee" aria-hidden="true">
+    <div class="top-bar-track">
+      <!-- Text is filled by script.js — edit TOP_BAR_TEXT at the top of script.js -->
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <div class="uni-seal"> SEC <br>CSE</div>
+    <div class="header-text">
+      <h1>Department of Computer Science & Engineering</h1>
+      <p>Batch 2026 &mdash; Official Student Page &nbsp;&bull;&nbsp; Session 2026–2030</p>
+    </div>
+  </div>
+</header>
+
+        <!-- NAV -->
+<nav>
+  <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="site-nav-menu">
+    <span class="nav-toggle-bar"></span>
+    <span class="nav-toggle-bar"></span>
+    <span class="nav-toggle-bar"></span>
+  </button>
+  <ul id="site-nav-menu">
+     <li><a href="index.html">Home</a></li>
+    <li><a href="member.html">Members</a></li>
+    <li><a href="gallery.html">Gallery</a></li>
+    <li><a href="notice.html">Notice Board</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+</nav>
+</div>
+
+<!-- NOTICE ADMIN PANEL -->
+<div id="notices">
+  <div class="section">
+    <div class="section-header">
+      <h3 class="js-typing">Notice Admin Panel</h3>
+      <span class="tag">Manage</span>
+    </div>
+
+    <p class="members-intro">
+      Add, edit or delete notices here &mdash; the Notice Board page and the Home Page
+      update automatically from the same shared data.
+    </p>
+
+    <!-- SIGN IN &mdash; visible until Firebase Authentication reports the admin user -->
+    <div class="admin-grid" id="admin-auth-card">
+      <div class="admin-card">
+        <h4>Admin Sign In</h4>
+
+        <p id="admin-auth-status" class="admin-status" role="status" aria-live="polite"></p>
+
+        <form id="admin-login-form" novalidate>
+          <div class="admin-field">
+            <label for="admin-email">Email</label>
+            <input type="email" id="admin-email" autocomplete="username" required>
+          </div>
+
+          <div class="admin-field">
+            <label for="admin-password">Password</label>
+            <input type="password" id="admin-password" autocomplete="current-password" required>
+          </div>
+
+          <div class="admin-actions">
+            <button type="submit" class="btn btn-gold" id="admin-login-submit">Sign In</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- SHOWN WHEN A SIGNED-IN ACCOUNT IS NOT THE ADMIN ACCOUNT -->
+    <div class="admin-grid" id="admin-unauthorized-card" hidden>
+      <div class="admin-card">
+        <h4>Not Authorized</h4>
+
+        <p class="members-intro" style="margin-bottom:16px">
+          You are signed in as <strong id="admin-unauthorized-email"></strong>,
+          but this account does not have permission to manage notices.
+          Please sign out and use the authorized admin account.
+        </p>
+
+        <div class="admin-actions">
+          <button type="button" class="btn btn-outline" id="admin-unauthorized-logout">Sign Out</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOTICE MANAGEMENT &mdash; visible to the authorized admin only -->
+    <div id="admin-panel" hidden>
+      <div class="admin-user-bar" id="admin-user-bar">
+        <span>Signed in as <strong id="admin-user-email"></strong></span>
+        <button type="button" class="btn btn-outline" id="admin-logout">Logout</button>
+      </div>
+
+      <div class="admin-grid">
+
+        <!-- ADD / EDIT FORM -->
+        <div class="admin-card">
+          <h4 id="admin-form-heading">Add New Notice</h4>
+
+          <p id="admin-status" class="admin-status" role="status" aria-live="polite"></p>
+
+          <form id="admin-notice-form" novalidate>
+            <input type="hidden" id="admin-id">
+
+            <div class="admin-field">
+              <label for="admin-title">Title</label>
+              <input type="text" id="admin-title" maxlength="120" placeholder="e.g. Tram Test &mdash; Mathematics" required>
+            </div>
+
+            <div class="admin-field-row">
+              <div class="admin-field">
+                <label for="admin-date">Date</label>
+                <input type="date" id="admin-date" required>
+              </div>
+              <div class="admin-field">
+                <label for="admin-type">Type</label>
+                <select id="admin-type">
+                  <option value="exam">Exam</option>
+                  <option value="event">Event</option>
+                  <option value="notice">Notice</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="admin-field">
+              <label for="admin-details">Details</label>
+              <textarea id="admin-details" rows="4" placeholder="Subject, time, venue&hellip;" required></textarea>
+            </div>
+
+            <div class="admin-actions">
+              <button type="submit" class="btn btn-gold" id="admin-submit">Add Notice</button>
+              <button type="button" class="btn btn-outline" id="admin-cancel-edit" style="display:none">Cancel Edit</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- CURRENT NOTICES LIST -->
+        <div class="admin-card">
+          <h4>Current Notices</h4>
+          <div id="admin-list"></div>
+        </div>
+
+      </div>
+
+      <!-- GALLERY MANAGEMENT — same admin account, same auth gate -->
+      <div class="section-header" id="gallery-admin">
+        <h3 class="js-typing">Gallery Management</h3>
+        <span class="tag">Media</span>
+      </div>
+
+      <p class="members-intro">
+        Add, edit or delete gallery images here &mdash; the public Gallery page
+        updates automatically from the same shared data. Images are added by
+        pasting an image URL/link.
+      </p>
+
+      <div class="admin-grid">
+
+        <!-- ADD / EDIT FORM -->
+        <div class="admin-card">
+          <h4 id="g-form-heading">Add Gallery Image</h4>
+
+          <p id="g-status" class="admin-status" role="status" aria-live="polite"></p>
+
+          <form id="gallery-admin-form" novalidate>
+            <input type="hidden" id="g-id">
+
+            <div class="admin-field">
+              <label for="g-url">Image URL</label>
+              <input type="url" id="g-url" maxlength="2048" placeholder="https://example.com/photo.jpg" required>
+            </div>
+
+            <div class="admin-field">
+              <label for="g-title">Title</label>
+              <input type="text" id="g-title" maxlength="120" placeholder="e.g. Convocation 2026">
+            </div>
+
+            <div class="admin-field-row">
+              <div class="admin-field">
+                <label for="g-category">Category (optional)</label>
+                <input type="text" id="g-category" maxlength="40" placeholder="e.g. events">
+              </div>
+              <div class="admin-field">
+                <label for="g-order">Display Order</label>
+                <input type="number" id="g-order" min="0" step="1" placeholder="e.g. 1">
+              </div>
+            </div>
+
+            <div class="admin-field">
+              <label for="g-caption">Caption (optional)</label>
+              <input type="text" id="g-caption" maxlength="200" placeholder="Short caption shown on the tile">
+            </div>
+
+            <div class="admin-actions">
+              <button type="submit" class="btn btn-gold" id="g-submit">Add Image</button>
+              <button type="button" class="btn btn-outline" id="g-cancel-edit" style="display:none">Cancel Edit</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- CURRENT GALLERY LIST -->
+        <div class="admin-card">
+          <h4>Current Gallery Images</h4>
+          <div id="gallery-admin-list"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div><strong> SEC CSE Batch 2026</strong> &mdash; Department of Computer Science &amp; Engineering</div>
+  <div class="footer-rule"></div>
+  <div>© Built with pride by Batch &rsquo;19 &nbsp;&bull;&nbsp; Session 2026&ndash;2030</div>
+  <nav class="footer-legal" aria-label="Legal and information">
+    <a href="privacy.html">Privacy Policy</a>
+    <span class="sep" aria-hidden="true">&bull;</span>
+    <a href="terms.html">Terms &amp; Conditions</a>
+    <span class="sep" aria-hidden="true">&bull;</span>
+    <a href="disclaimer.html">Disclaimer</a>
+  </nav>
+</footer>
+
+</body>
+</html>

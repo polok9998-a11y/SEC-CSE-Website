@@ -16,7 +16,9 @@
 </script>
 <style>html.dark-mode{background:#0d1320}</style>
 <link rel="stylesheet" href="style1.css">
+<script src="gallery-data.js" defer></script>
 <script src="script.js" defer></script>
+<script type="module" src="firebase-config.js"></script>
 </head>
 <body>
 
@@ -44,7 +46,12 @@
 
 <!-- NAV -->
 <nav>
-  <ul>
+  <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="site-nav-menu">
+    <span class="nav-toggle-bar"></span>
+    <span class="nav-toggle-bar"></span>
+    <span class="nav-toggle-bar"></span>
+  </button>
+  <ul id="site-nav-menu">
      <li><a href="index.html">Home</a></li>
     <li><a href="member.html">Members</a></li>
     <li><a href="gallery.html" class="active">Gallery</a></li>
@@ -67,74 +74,10 @@
       celebrations and everyday campus life. Click any tile to view it up close.
     </p>
 
-    <div class="gallery-grid">
-
-      <div class="gallery-item" data-category="events" data-reveal>
-        <span class="gallery-emoji">&#127891;</span>
-        <div class="gallery-caption">Convocation 2026</div>
-      </div>
-
-      <div class="gallery-item" data-category="contests" data-reveal>
-        <span class="gallery-emoji">&#127942;</span>
-        <div class="gallery-caption">Programming Contest</div>
-      </div>
-
-      <div class="gallery-item" data-category="contests" data-reveal>
-        <span class="gallery-emoji">&#128187;</span>
-        <div class="gallery-caption">Hackathon 2026</div>
-      </div>
-
-      <div class="gallery-item" data-category="contests" data-reveal>
-        <span class="gallery-emoji">&#128444;&#65039;</span>
-        <div class="gallery-caption">Project Showcase</div>
-      </div>
-
-      <div class="gallery-item" data-category="events" data-reveal>
-        <span class="gallery-emoji">&#127881;</span>
-        <div class="gallery-caption">Batch Party</div>
-      </div>
-
-      <div class="gallery-item" data-category="events" data-reveal>
-        <span class="gallery-emoji">&#9917;</span>
-        <div class="gallery-caption">Sports Week</div>
-      </div>
-
-      <div class="gallery-item" data-category="events" data-reveal>
-        <span class="gallery-emoji">&#127908;</span>
-        <div class="gallery-caption">Cultural Night</div>
-      </div>
-
-      <div class="gallery-item" data-category="events" data-reveal>
-        <span class="gallery-emoji">&#128681;</span>
-        <div class="gallery-caption">Freshers&rsquo; Rally</div>
-      </div>
-
-      <div class="gallery-item" data-category="tours" data-reveal>
-        <span class="gallery-emoji">&#127956;&#65039;</span>
-        <div class="gallery-caption">Study Tour &mdash; Sajek</div>
-      </div>
-
-      <div class="gallery-item" data-category="tours" data-reveal>
-        <span class="gallery-emoji">&#128652;</span>
-        <div class="gallery-caption">Industrial Tour</div>
-      </div>
-
-      <div class="gallery-item" data-category="campus" data-reveal>
-        <span class="gallery-emoji">&#128218;</span>
-        <div class="gallery-caption">Library Sessions</div>
-      </div>
-
-      <div class="gallery-item" data-category="campus" data-reveal>
-        <span class="gallery-emoji">&#129514;</span>
-        <div class="gallery-caption">Lab &amp; Practical Classes</div>
-      </div>
-
-      <div class="gallery-item" data-category="campus" data-reveal>
-        <span class="gallery-emoji">&#127769;</span>
-        <div class="gallery-caption">Late Night Coding</div>
-      </div>
-
-    </div>
+    <!-- Gallery images are rendered by script.js from the shared GalleryStore
+         (gallery-data.js / Firestore "gallery" collection).
+         Add/edit/delete images in admin.html and this grid updates automatically. -->
+    <div class="gallery-grid" data-gallery-grid></div>
   </div>
 </div>
 

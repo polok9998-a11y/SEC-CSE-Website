@@ -54,8 +54,11 @@
     transition: background-color 0.3s ease, color 0.3s ease;
   }
 
-  /* ── TOP BAR (seamless marquee) ── */
+  /* ── TOP BAR (seamless marquee, pinned while scrolling) ── */
   .top-bar {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
     background: var(--navy);
     color: var(--gray-300);
     font-size: 0.75rem;
@@ -97,13 +100,16 @@
     .top-bar-track { animation: none; }
   }
 
-  /* ── STICKY TOP STACK (top bar + header + nav stay pinned while scrolling) ── */
+  /* ── TOP AREA WRAPPER ──
+     display:contents removes this wrapper's own box, so the sticky .top-bar
+     is constrained by <body> and stays pinned for the WHOLE page scroll,
+     while header and nav stay in normal flow and scroll underneath it. */
   .sticky-head {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    display: contents;
   }
+
+  /* the shadow the wrapper used to carry (only its bottom edge was ever
+     visible) now sits on nav — identical look at rest */
 
   /* ── HEADER ── */
   header {
@@ -152,9 +158,13 @@
     letter-spacing: 0.02em;
   }
 
-  /* ── NAV ── */
+  /* ── NAV (pinned directly below the sticky Top Bar) ── */
   nav {
     background: var(--navy);
+    position: sticky;
+    top: var(--topbar-h, 0px);
+    z-index: 999;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
   }
 
   nav ul {
@@ -1578,3 +1588,183 @@
   .admin-user-bar strong { color: var(--heading-text); }
 
   .admin-user-bar .btn { padding: 7px 18px; font-size: 0.78rem; cursor: pointer; }
+
+  /* ══════════════════════════════════════════════════════════
+     ADDITIONS — sticky-header offsets, mobile hamburger menu,
+     dynamic Firestore gallery. Reuse existing colors/typography.
+     ══════════════════════════════════════════════════════════ */
+
+  /* ── STICKY HEADER SCROLL OFFSETS ──
+     --sticky-offset (Top Bar + nav, measured by script.js) keeps
+     hash/anchor targets clear of the pinned bar and nav;
+     --topbar-h is the Top Bar height the sticky nav parks below. */
+  html { scroll-padding-top: var(--sticky-offset, 0px); }
+
+  [id] { scroll-margin-top: var(--sticky-offset, 0px); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+
+  /* ── MOBILE HAMBURGER NAVIGATION ── */
+  .nav-toggle {
+    display: none;               /* desktop keeps the plain link row */
+    width: 46px;
+    height: 42px;
+    margin-right: 12px;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+
+  .nav-toggle .nav-toggle-bar {
+    display: block;
+    width: 24px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--gold);
+    transition: transform 0.25s ease, opacity 0.25s ease, background-color 0.2s ease;
+  }
+
+  .nav-toggle:hover .nav-toggle-bar,
+  .nav-toggle:focus-visible .nav-toggle-bar {
+    background: var(--gold-light);
+  }
+
+  .nav-toggle:focus-visible {
+    outline: 2px solid var(--gold-light);
+    outline-offset: 2px;
+  }
+
+  /* three lines -> X when the menu is open */
+  .nav-toggle.open .nav-toggle-bar:nth-child(1) { transform: translateY(8px) rotate(45deg); }
+  .nav-toggle.open .nav-toggle-bar:nth-child(2) { opacity: 0; }
+  .nav-toggle.open .nav-toggle-bar:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+
+  @media (max-width: 768px) {
+
+    /* Collapsed hamburger mode applies ONLY once script.js has confirmed
+       JS is running (.js-nav on <html>), so with JS disabled the nav still
+       shows today's wrapped list of links. */
+    .js-nav nav {
+      display: flex;
+      justify-content: flex-end;
+      align-items: stretch;
+      /* position: sticky comes from the base nav rule; sticky still anchors
+         the absolute-positioned dropdown below the hamburger button */
+      padding: 4px 10px;
+    }
+
+    .js-nav nav .nav-toggle { display: inline-flex; }
+
+    /* dropdown overlays page content; stays inside nav
+       (z-index 999), so it is never hidden behind cards/images */
+    .js-nav nav > ul {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      flex-direction: column;
+      background: var(--navy);
+      box-shadow: 0 16px 28px rgba(0, 0, 0, 0.35);
+      padding: 6px 0 10px;
+      margin: 0;
+    }
+
+    .js-nav nav > ul.open { display: flex; }
+
+    .js-nav nav > ul li a {
+      display: block;
+      padding: 13px 24px;
+      font-size: 0.85rem;
+    }
+  }
+
+  /* ── DYNAMIC GALLERY IMAGES ── */
+  .gallery-item .gallery-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.4s ease;
+  }
+
+  .gallery-item:hover .gallery-img { transform: scale(1.06); }
+
+  /* broken/missing image URL -> JS swaps in an emoji tile fallback */
+  .gallery-item.broken .gallery-caption { opacity: 1; }
+
+  /* loading skeletons shown while Firestore responds */
+  .gallery-skeleton {
+    background: linear-gradient(100deg,
+      var(--gray-100) 40%, var(--white) 50%, var(--gray-100) 60%);
+    background-size: 200% 100%;
+    animation: galleryShimmer 1.3s linear infinite;
+    cursor: default;
+    border-color: var(--border-color);
+  }
+
+  .gallery-skeleton:hover { border-color: rgba(184,134,11,0.25); box-shadow: none; }
+  .gallery-skeleton:hover::after { content: none; }
+
+  @keyframes galleryShimmer {
+    from { background-position: 200% 0; }
+    to   { background-position: -200% 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gallery-skeleton { animation: none; }
+    .gallery-item:hover .gallery-img { transform: none; }
+  }
+
+  /* full-size photo inside the existing lightbox */
+  .lightbox-img {
+    display: block;
+    max-width: min(92vw, 960px);
+    max-height: 76vh;
+    object-fit: contain;
+    margin: 0 auto 14px;
+    border: 1px solid rgba(212,160,23,0.4);
+  }
+
+  /* ── ADMIN: GALLERY MANAGEMENT ── */
+  .admin-thumb {
+    width: 64px;
+    height: 48px;
+    object-fit: cover;
+    background: var(--gray-100);
+    border: 1px solid var(--border-color);
+    flex-shrink: 0;
+  }
+
+  .admin-thumb-box {
+    width: 64px;
+    height: 48px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gray-100);
+    border: 1px solid var(--border-color);
+    color: rgba(184,134,11,0.5);
+    font-size: 1.2rem;
+  }
+
+  .admin-item-url {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
