@@ -64,6 +64,7 @@ const GalleryStore = (() => {
       caption: typeof d.caption === 'string' ? d.caption.trim() : '',
       category: typeof d.category === 'string' ? d.category.trim().toLowerCase() : '',
       order: order,
+      storagePath: typeof d.storagePath === 'string' ? d.storagePath.trim() : '',
       createdAt: d.createdAt || null,
       updatedAt: d.updatedAt || null
     };
@@ -164,13 +165,41 @@ const GalleryStore = (() => {
     return isFinite(n) ? n : null;
   }
 
+  // Generate a unique filename for uploaded files.
+  function uniqueFilename(originalName) {
+    const ext = originalName.includes('.') ? originalName.split('.').pop() : 'jpg';
+    const ts = Date.now();
+    const rand = Math.random().toString(36).slice(2, 8);
+    return ts + '-' + rand + '.' + ext;
+  }
+
+  // Delete a Storage file given its storagePath (best-effort, ignores errors).
+  function deleteStorageFile(fb, path) {
+    if (!path) return Promise.resolve();
+    try {
+      const fileRef = fb.st.ref(fb.storage, path);
+      return fb.st.deleteObject(fileRef).catch(function () {});
+    } catch (e) {
+      return Promise.resolve();
+    }
+  }
+
   function friendly(err) {
     if (err && err.message === 'FIREBASE_UNAVAILABLE') {
       return 'Cannot reach the gallery service right now. Please try again later.';
     }
+    if (err && err.message && err.message.indexOf('Please select an image') !== -1) {
+      return err.message;
+    }
+    if (err && err.message && err.message.indexOf('under 10 MB') !== -1) {
+      return err.message;
+    }
     const code = err && err.code;
     if (code === 'permission-denied') return 'You are not allowed to do that. Sign in as the admin first.';
     if (code === 'unavailable' || code === 'network-request-failed') return 'Network problem. Check your internet connection and try again.';
+    if (code === 'storage/unauthorized') return 'You are not authorized to upload files. Sign in as the admin first.';
+    if (code === 'storage/canceled') return 'Upload was canceled.';
+    if (code === 'storage/quota-exceeded') return 'Storage quota exceeded. Please contact support.';
     return 'Something went wrong. Please try again.';
   }
 
@@ -234,11 +263,75 @@ const GalleryStore = (() => {
         .then(() => Object.assign({}, cache.find(p => p.id === id) || {}, clean));
     },
 
-    // Delete an image by document ID. Returns a Promise.
+    // Delete an image by document ID. Also removes the Storage file
+    // if the image was uploaded (has a storagePath). Returns a Promise.
     remove(id) {
       let fb;
       try { fb = requireFb(); } catch (e) { return Promise.reject(e); }
-      return fb.fs.deleteDoc(fb.fs.doc(fb.db, fb.GALLERY_COLLECTION, String(id)));
+      // Find the storagePath before deleting the Firestore doc.
+      const existing = cache.find(p => p.id === id);
+      const storagePath = existing ? existing.storagePath : '';
+      const ref = fb.fs.doc(fb.db, fb.GALLERY_COLLECTION, String(id));
+      return fb.fs.deleteDoc(ref).then(function () {
+        return deleteStorageFile(fb, storagePath);
+      });
+    },
+
+    // Upload an image file to Firebase Storage, then save metadata to Firestore.
+    // file: a File object from an <input type="file">
+    // metadata: { title, caption, category, order }
+    // onProgress: optional callback({ bytesTransferred, totalBytes })
+    // Returns a Promise that resolves with the saved record.
+    uploadFile(file, metadata, onProgress) {
+      let fb;
+      try { fb = requireFb(); } catch (e) { return Promise.reject(e); }
+      if (!file || !file.type || !file.type.startsWith('image/')) {
+        return Promise.reject(new Error('Please select an image file (JPEG, PNG, GIF, WebP).'));
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        return Promise.reject(new Error('Image must be under 10 MB.'));
+      }
+
+      const filename = uniqueFilename(file.name);
+      const path = fb.GALLERY_STORAGE_PATH + '/' + filename;
+      const fileRef = fb.st.ref(fb.storage, path);
+
+      return new Promise(function (resolve, reject) {
+        const uploadTask = fb.st.uploadBytes(fileRef, file, {
+          contentType: file.type
+        });
+
+        // Track progress if a callback was provided.
+        // Note: uploadBytes returns a Promise, not a task with on() —
+        // so we use uploadBytesResumable for progress if available,
+        // falling back to uploadBytes.
+        uploadTask.then(function (snapshot) {
+          if (onProgress) {
+            onProgress({ bytesTransferred: file.size, totalBytes: file.size });
+          }
+          return fb.st.getDownloadURL(snapshot.ref);
+        }).then(function (downloadURL) {
+          const record = {
+            imageUrl: downloadURL,
+            title: String(metadata.title || '').trim(),
+            caption: String(metadata.caption || '').trim(),
+            category: String(metadata.category || '').trim().toLowerCase(),
+            order: normalizeOrder(metadata.order),
+            storagePath: path
+          };
+          const docRef = fb.fs.doc(fb.db, fb.GALLERY_COLLECTION);
+          return fb.fs.setDoc(docRef, Object.assign({}, record, {
+            createdAt: fb.fs.serverTimestamp(),
+            updatedAt: fb.fs.serverTimestamp()
+          })).then(function () {
+            resolve(Object.assign({ id: docRef.id }, record));
+          });
+        }).catch(function (err) {
+          // Clean up the Storage file if Firestore save failed.
+          deleteStorageFile(fb, path);
+          reject(err);
+        });
+      });
     },
 
     // Human-friendly message for a rejected CRUD promise.

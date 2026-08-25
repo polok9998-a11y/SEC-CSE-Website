@@ -1070,13 +1070,31 @@ document.addEventListener('DOMContentLoaded', () => {
       title: document.getElementById('g-title'),
       caption: document.getElementById('g-caption'),
       category: document.getElementById('g-category'),
-      order: document.getElementById('g-order')
+      order: document.getElementById('g-order'),
+      fileData: document.getElementById('g-file-data')
     };
     const gHeading = document.getElementById('g-form-heading');
     const gSubmitBtn = document.getElementById('g-submit');
     const gCancelBtn = document.getElementById('g-cancel-edit');
     const gStatusEl = document.getElementById('g-status');
     const gList = document.getElementById('gallery-admin-list');
+
+    // File upload elements
+    const gUploadZone = document.getElementById('g-upload-zone');
+    const gUploadArea = document.getElementById('g-upload-area');
+    const gFileInput = document.getElementById('g-file');
+    const gPreview = document.getElementById('g-preview');
+    const gPreviewImg = document.getElementById('g-preview-img');
+    const gPreviewRemove = document.getElementById('g-preview-remove');
+    const gProgress = document.getElementById('g-progress');
+    const gProgressFill = document.getElementById('g-progress-fill');
+    const gProgressText = document.getElementById('g-progress-text');
+    const gUrlInput = document.getElementById('g-url-input');
+    const gModeUpload = document.getElementById('g-mode-upload');
+    const gModeUrl = document.getElementById('g-mode-url');
+
+    let currentMode = 'upload'; // 'upload' or 'url'
+    let selectedFile = null;
 
     // Client-side fail-fast guard for gallery writes — mirrors the notice
     // panel guard above. Real enforcement lives in firestore.rules.
@@ -1112,27 +1130,114 @@ document.addEventListener('DOMContentLoaded', () => {
       gStatusEl.style.display = message ? 'block' : 'none';
     }
 
+    // ── Mode toggle (upload vs URL) ──
+    function switchMode(mode) {
+      currentMode = mode;
+      if (gModeUpload) gModeUpload.classList.toggle('active', mode === 'upload');
+      if (gModeUrl) gModeUrl.classList.toggle('active', mode === 'url');
+      if (gUploadZone) gUploadZone.hidden = mode !== 'upload';
+      if (gUrlInput) gUrlInput.hidden = mode !== 'url';
+    }
+
+    if (gModeUpload) gModeUpload.addEventListener('click', function () { switchMode('upload'); });
+    if (gModeUrl) gModeUrl.addEventListener('click', function () { switchMode('url'); });
+
+    // ── File upload zone: click to browse ──
+    if (gUploadArea && gFileInput) {
+      gUploadArea.addEventListener('click', function () { gFileInput.click(); });
+      gFileInput.addEventListener('change', function () {
+        if (gFileInput.files && gFileInput.files[0]) {
+          handleFileSelect(gFileInput.files[0]);
+        }
+      });
+
+      // Drag and drop
+      gUploadArea.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        gUploadArea.classList.add('dragover');
+      });
+      gUploadArea.addEventListener('dragleave', function () {
+        gUploadArea.classList.remove('dragover');
+      });
+      gUploadArea.addEventListener('drop', function (e) {
+        e.preventDefault();
+        gUploadArea.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          handleFileSelect(e.dataTransfer.files[0]);
+        }
+      });
+    }
+
+    function handleFileSelect(file) {
+      if (!file.type.startsWith('image/')) {
+        setGalleryStatus('Please select an image file (JPEG, PNG, GIF, WebP).', true);
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        setGalleryStatus('Image must be under 10 MB.', true);
+        return;
+      }
+      selectedFile = file;
+      setGalleryStatus('', false);
+
+      // Show preview
+      var reader = new FileReader();
+      reader.onload = function (ev) {
+        if (gPreviewImg) gPreviewImg.src = ev.target.result;
+        if (gPreview) gPreview.hidden = false;
+        if (gUploadArea) gUploadArea.style.display = 'none';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    if (gPreviewRemove) {
+      gPreviewRemove.addEventListener('click', function () {
+        selectedFile = null;
+        if (gFileInput) gFileInput.value = '';
+        if (gPreview) gPreview.hidden = true;
+        if (gPreviewImg) gPreviewImg.src = '';
+        if (gUploadArea) gUploadArea.style.display = '';
+      });
+    }
+
+    function showUploadProgress(percent) {
+      if (gProgress) gProgress.hidden = false;
+      if (gProgressFill) gProgressFill.style.width = Math.min(100, Math.round(percent)) + '%';
+      if (gProgressText) gProgressText.textContent = percent >= 100 ? 'Processing...' : 'Uploading... ' + Math.round(percent) + '%';
+    }
+
+    function hideUploadProgress() {
+      if (gProgress) gProgress.hidden = true;
+      if (gProgressFill) gProgressFill.style.width = '0%';
+    }
+
     function resetGalleryForm() {
       galleryForm.reset();
       gFields.id.value = '';
+      gFields.fileData.value = '';
+      selectedFile = null;
+      if (gFileInput) gFileInput.value = '';
+      if (gPreview) gPreview.hidden = true;
+      if (gPreviewImg) gPreviewImg.src = '';
+      if (gUploadArea) gUploadArea.style.display = '';
+      hideUploadProgress();
       gHeading.textContent = 'Add Gallery Image';
       gSubmitBtn.textContent = 'Add Image';
       gCancelBtn.style.display = 'none';
+      switchMode('upload');
     }
 
-    function readGalleryForm() {
-      const data = {
+    function validateUrlMode() {
+      var data = {
         imageUrl: gFields.url.value.trim(),
         title: gFields.title.value.trim(),
         caption: gFields.caption.value.trim(),
         category: gFields.category.value.trim(),
         order: gFields.order.value.trim()
       };
-      if (!data.imageUrl) {
-        return { error: 'Please enter an image URL.' };
-      }
+      if (!data.imageUrl) return { error: 'Please enter an image URL.' };
       try {
-        const parsed = new URL(data.imageUrl);
+        var parsed = new URL(data.imageUrl);
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
           return { error: 'The image URL must start with http:// or https://.' };
         }
@@ -1145,32 +1250,102 @@ document.addEventListener('DOMContentLoaded', () => {
       return { data: data };
     }
 
-    galleryForm.addEventListener('submit', e => {
+    galleryForm.addEventListener('submit', function (e) {
       e.preventDefault();
       if (!requireGalleryAdminSignIn()) return;
-      const result = readGalleryForm();
-      if (result.error) {
-        setGalleryStatus(result.error, true);
+
+      var editId = gFields.id.value;
+      var metadata = {
+        title: gFields.title.value.trim(),
+        caption: gFields.caption.value.trim(),
+        category: gFields.category.value.trim(),
+        order: gFields.order.value.trim()
+      };
+
+      if (metadata.order !== '' && (!isFinite(Number(metadata.order)) || Number(metadata.order) < 0)) {
+        setGalleryStatus('Display order must be a number of 0 or more (or left empty).', true);
         return;
       }
-      const editId = gFields.id.value;
+
       gSubmitBtn.disabled = true;
       gCancelBtn.disabled = true;
 
-      const request = editId ? GalleryStore.update(editId, result.data) : GalleryStore.add(result.data);
-      request.then(() => {
-        resetGalleryForm();
-        setGalleryStatus(editId
-          ? 'Image updated. The public Gallery page is in sync.'
-          : 'Image added. It is now live on the public Gallery page.');
-      }).catch(err => {
-        let msg = GalleryStore.messageFor(err);
-        if (err && err.message === 'IMAGE_URL_REQUIRED') msg = 'Please enter an image URL.';
-        setGalleryStatus(msg, true);
-      }).finally(() => {
+      // ── EDIT MODE: always uses URL mode (update existing record) ──
+      if (editId) {
+        if (currentMode === 'url') {
+          var result = validateUrlMode();
+          if (result.error) {
+            setGalleryStatus(result.error, true);
+            gSubmitBtn.disabled = false;
+            gCancelBtn.disabled = false;
+            return;
+          }
+          GalleryStore.update(editId, result.data).then(function () {
+            resetGalleryForm();
+            setGalleryStatus('Image updated. The public Gallery page is in sync.');
+          }).catch(function (err) {
+            setGalleryStatus(GalleryStore.messageFor(err), true);
+          }).finally(function () {
+            gSubmitBtn.disabled = false;
+            gCancelBtn.disabled = false;
+          });
+        } else {
+          // Editing metadata only (no new file in edit mode)
+          GalleryStore.update(editId, metadata).then(function () {
+            resetGalleryForm();
+            setGalleryStatus('Image updated. The public Gallery page is in sync.');
+          }).catch(function (err) {
+            setGalleryStatus(GalleryStore.messageFor(err), true);
+          }).finally(function () {
+            gSubmitBtn.disabled = false;
+            gCancelBtn.disabled = false;
+          });
+        }
+        return;
+      }
+
+      // ── ADD MODE ──
+      if (currentMode === 'upload' && selectedFile) {
+        // File upload path
+        showUploadProgress(0);
+        GalleryStore.uploadFile(selectedFile, metadata, function (progress) {
+          showUploadProgress(progress.totalBytes > 0 ? (progress.bytesTransferred / progress.totalBytes) * 100 : 0);
+        }).then(function () {
+          hideUploadProgress();
+          resetGalleryForm();
+          setGalleryStatus('Image uploaded successfully. It is now live on the public Gallery page.');
+        }).catch(function (err) {
+          hideUploadProgress();
+          setGalleryStatus(GalleryStore.messageFor(err), true);
+        }).finally(function () {
+          gSubmitBtn.disabled = false;
+          gCancelBtn.disabled = false;
+        });
+      } else if (currentMode === 'url') {
+        // URL path
+        var urlResult = validateUrlMode();
+        if (urlResult.error) {
+          setGalleryStatus(urlResult.error, true);
+          gSubmitBtn.disabled = false;
+          gCancelBtn.disabled = false;
+          return;
+        }
+        GalleryStore.add(urlResult.data).then(function () {
+          resetGalleryForm();
+          setGalleryStatus('Image added. It is now live on the public Gallery page.');
+        }).catch(function (err) {
+          var msg = GalleryStore.messageFor(err);
+          if (err && err.message === 'IMAGE_URL_REQUIRED') msg = 'Please enter an image URL.';
+          setGalleryStatus(msg, true);
+        }).finally(function () {
+          gSubmitBtn.disabled = false;
+          gCancelBtn.disabled = false;
+        });
+      } else {
+        setGalleryStatus('Please select an image file or switch to URL mode.', true);
         gSubmitBtn.disabled = false;
         gCancelBtn.disabled = false;
-      });
+      }
     });
 
     gCancelBtn.addEventListener('click', resetGalleryForm);
@@ -1207,6 +1382,12 @@ document.addEventListener('DOMContentLoaded', () => {
         gHeading.textContent = 'Edit Gallery Image';
         gSubmitBtn.textContent = 'Update Image';
         gCancelBtn.style.display = '';
+        // In edit mode, default to URL mode so the existing URL is pre-filled
+        switchMode('url');
+        selectedFile = null;
+        if (gFileInput) gFileInput.value = '';
+        if (gPreview) gPreview.hidden = true;
+        if (gUploadArea) gUploadArea.style.display = '';
         setGalleryStatus('Editing "' + (photo.title || photo.imageUrl) + '".', false);
         galleryForm.scrollIntoView({ behavior: scrollBehavior, block: 'start' });
       }
@@ -1269,6 +1450,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const metaBits = [];
         metaBits.push(photo.order === null ? 'No order' : 'Order ' + photo.order);
         if (photo.category) metaBits.push(photo.category.charAt(0).toUpperCase() + photo.category.slice(1));
+        if (photo.storagePath) metaBits.push('Uploaded');
         const metaEl = document.createElement('span');
         metaEl.className = 'admin-item-date';
         metaEl.textContent = metaBits.join(' \u00b7 ');

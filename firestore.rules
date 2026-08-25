@@ -1,72 +1,29 @@
 rules_version = '2';
 
-// ============================================================
-// FIRESTORE SECURITY RULES — SEC CSE Batch 2026 Notice System
-// ============================================================
-//
-// ─── WHAT YOU MUST EDIT ─────────────────────────────────────
-// Replace YOUR_ADMIN_UID below with the UID of your Firebase
-// Authentication admin user. To add more admins later, add more
-// lines inside the list — one UID per line.
-//
-// Find UIDs in: Firebase Console → Authentication → Users →
-// the "User UID" column.
-//
-// These rules are the REAL security boundary for the website.
-// Do not rely on anything in the frontend JavaScript — anyone
-// can read that code. Until you replace YOUR_ADMIN_UID and
-// deploy these rules, DO NOT consider the database secure
-// (note: with the placeholder still in place NO ONE can write,
-// which fails safe — the site is read-only for everybody).
-//
-// How to deploy: see FIREBASE-SETUP.md (section "Deploy the
-// Security Rules").
-// ============================================================
-
 service cloud.firestore {
   match /databases/{database} {
 
-    // Helper: true only when the request comes from an account
-    // whose UID is listed here. Keep this list identical to
-    // ADMIN_UIDS in firebase-config.js (that copy only controls
-    // the Admin Panel UI — this one controls the database).
     function isAdmin() {
       return request.auth != null
         && request.auth.uid in [
-          "YOUR_ADMIN_UID"  // ← REPLACE with your admin user's UID
+          "ASoDradWjJhgYA7a73q091YOSeY2"
         ];
     }
 
-    // The notice board collection.
     match /notices/{noticeId} {
-
-      // PUBLIC: every visitor (even signed out) can read notices.
       allow get: if true;
       allow list: if true;
-
-      // ADMIN ONLY: only an authenticated, whitelisted admin UID
-      // may create, edit/update or delete notices. Everyone else
-      // — including any other signed-in Firebase user — is denied.
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // The public photo gallery collection.
     match /gallery/{imageId} {
-
-      // PUBLIC: every visitor (even signed out) can view gallery images.
       allow get: if true;
       allow list: if true;
-
-      // ADMIN ONLY: same whitelist check as the notices above.
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
-
-    // Everything else is denied by default (no rule = no access),
-    // so no other collection can be read or written by visitors,
-    // signed-in users, or admins unless a rule explicitly allows it.
   }
 }

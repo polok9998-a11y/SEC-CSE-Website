@@ -20,12 +20,12 @@
 // ============================================================
 
 const firebaseConfig = {
-  apiKey: "YOUR_FIREBASE_API_KEY",                  // ← REPLACE
-  authDomain: "YOUR_FIREBASE_AUTH_DOMAIN",          // ← REPLACE (e.g. "my-project.firebaseapp.com")
-  projectId: "YOUR_FIREBASE_PROJECT_ID",            // ← REPLACE
-  storageBucket: "YOUR_FIREBASE_STORAGE_BUCKET",    // ← REPLACE
-  messagingSenderId: "YOUR_FIREBASE_MESSAGING_SENDER_ID", // ← REPLACE
-  appId: "YOUR_FIREBASE_APP_ID"                     // ← REPLACE
+  apiKey: "AIzaSyAtKFmKruiG59FQ_HQls972KC8bWyvtSGQ",
+  authDomain: "student-notice-board-33c3a.firebaseapp.com",
+  projectId: "student-notice-board-33c3a",
+  storageBucket: "student-notice-board-33c3a.firebasestorage.app",
+  messagingSenderId: "443898490438",
+  appId: "1:443898490438:web:d7a0e30fc74013d7d9a447"
 };
 
 // ─── ADMIN UID WHITELIST ────────────────────────────────────
@@ -40,7 +40,7 @@ const firebaseConfig = {
 //
 // You can add more admins later by adding more UIDs to the array.
 const ADMIN_UIDS = [
-  "YOUR_ADMIN_UID" // ← REPLACE with your Firebase Auth user UID
+  "ASoDradWjJhgYA7a73q091YOSeY2"
 ];
 
 // ============================================================
@@ -52,7 +52,7 @@ const ADMIN_UIDS = [
 (function () {
   "use strict";
 
-  const PLACEHOLDER_VALUES = ["YOUR_ADMIN_UID"];
+  const PLACEHOLDER_VALUES = [];
 
   function isPlaceholder(value) {
     return typeof value !== "string" ||
@@ -103,15 +103,18 @@ const ADMIN_UIDS = [
   Promise.all([
     import(SDK + "/firebase-app.js"),
     import(SDK + "/firebase-firestore.js"),
-    import(SDK + "/firebase-auth.js")
+    import(SDK + "/firebase-auth.js"),
+    import(SDK + "/firebase-storage.js")
   ]).then(modules => {
     const app = modules[0];
     const fs = modules[1];
     const authMod = modules[2];
+    const storageMod = modules[3];
 
     const firebaseApp = app.initializeApp(firebaseConfig);
     const db = fs.getFirestore(firebaseApp);
     const auth = authMod.getAuth(firebaseApp);
+    const storage = storageMod.getStorage(firebaseApp);
 
     window.NoticeFirebase = {
       ready: true,
@@ -122,11 +125,13 @@ const ADMIN_UIDS = [
       app: firebaseApp,
       db: db,
       auth: auth,
+      storage: storage,
 
       // Config
       ADMIN_UIDS: ADMIN_UIDS.filter(uid => !PLACEHOLDER_VALUES.includes(uid)),
       COLLECTION: "notices",
       GALLERY_COLLECTION: "gallery",
+      GALLERY_STORAGE_PATH: "gallery/images",
 
       // Firestore helpers used by notices-data.js
       fs: {
@@ -139,6 +144,14 @@ const ADMIN_UIDS = [
         deleteDoc: fs.deleteDoc,
         onSnapshot: fs.onSnapshot,
         serverTimestamp: fs.serverTimestamp
+      },
+
+      // Storage helpers used by gallery-data.js
+      st: {
+        ref: storageMod.ref,
+        uploadBytes: storageMod.uploadBytes,
+        getDownloadURL: storageMod.getDownloadURL,
+        deleteObject: storageMod.deleteObject
       },
 
       // Auth helpers used by the Admin Panel

@@ -1768,3 +1768,140 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  /* ── GALLERY UPLOAD MODE TOGGLE ── */
+  .g-mode-toggle {
+    display: flex;
+    gap: 0;
+    margin-bottom: 16px;
+    border: 1px solid var(--gray-300);
+    overflow: hidden;
+  }
+
+  .g-mode-btn {
+    flex: 1;
+    padding: 8px 14px;
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    background: var(--white);
+    color: var(--gray-500);
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .g-mode-btn + .g-mode-btn { border-left: 1px solid var(--gray-300); }
+  .g-mode-btn:hover { background: var(--gray-100); }
+  .g-mode-btn.active {
+    background: var(--navy);
+    color: var(--gold);
+  }
+
+  /* ── FILE UPLOAD ZONE ── */
+  .g-upload-area {
+    border: 2px dashed var(--gray-300);
+    border-radius: 6px;
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    margin-bottom: 12px;
+  }
+
+  .g-upload-area:hover,
+  .g-upload-area.dragover {
+    border-color: var(--gold);
+    background: rgba(184, 134, 11, 0.04);
+  }
+
+  .g-upload-area svg {
+    color: var(--gray-300);
+    margin-bottom: 10px;
+  }
+
+  .g-upload-area:hover svg,
+  .g-upload-area.dragover svg {
+    color: var(--gold);
+  }
+
+  .g-upload-area p {
+    font-size: 0.88rem;
+    color: var(--gray-500);
+    margin-bottom: 4px;
+  }
+
+  .g-upload-area p strong { color: var(--gold); }
+
+  .g-upload-area span {
+    font-size: 0.75rem;
+    color: var(--gray-300);
+  }
+
+  /* ── FILE PREVIEW ── */
+  .g-preview {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 12px;
+  }
+
+  .g-preview img {
+    max-width: 100%;
+    max-height: 200px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    display: block;
+  }
+
+  .g-preview-remove {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    background: var(--red-accent);
+    color: var(--white);
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding: 0;
+  }
+
+  .g-preview-remove:hover { background: #a52323; }
+
+  /* ── UPLOAD PROGRESS ── */
+  .g-progress {
+    margin-bottom: 12px;
+  }
+
+  .g-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--gray-100);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+
+  .g-progress-fill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, var(--gold), var(--gold-light));
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+
+  .g-progress-text {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+  }
+
+  /* ── URL INPUT HIDDEN BY DEFAULT ── */
+  .g-url-input[hidden] { display: none; }

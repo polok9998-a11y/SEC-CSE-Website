@@ -183,8 +183,8 @@
 
       <p class="members-intro">
         Add, edit or delete gallery images here &mdash; the public Gallery page
-        updates automatically from the same shared data. Images are added by
-        pasting an image URL/link.
+        updates automatically from the same shared data. You can upload an image
+        file directly or paste an external image URL.
       </p>
 
       <div class="admin-grid">
@@ -195,13 +195,43 @@
 
           <p id="g-status" class="admin-status" role="status" aria-live="polite"></p>
 
-          <form id="gallery-admin-form" novalidate>
-            <input type="hidden" id="g-id">
+          <!-- UPLOAD MODE TOGGLE -->
+          <div class="g-mode-toggle">
+            <button type="button" class="g-mode-btn active" id="g-mode-upload" data-mode="upload">Upload File</button>
+            <button type="button" class="g-mode-btn" id="g-mode-url" data-mode="url">Paste URL</button>
+          </div>
 
+          <!-- FILE UPLOAD ZONE -->
+          <div class="g-upload-zone" id="g-upload-zone">
+            <input type="file" id="g-file" accept="image/*" hidden>
+            <div class="g-upload-area" id="g-upload-area">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <p>Drag & drop an image here, or <strong>browse</strong></p>
+              <span>JPEG, PNG, GIF or WebP &middot; Max 10 MB</span>
+            </div>
+            <!-- Image preview -->
+            <div class="g-preview" id="g-preview" hidden>
+              <img id="g-preview-img" src="" alt="Preview">
+              <button type="button" class="g-preview-remove" id="g-preview-remove" title="Remove">&times;</button>
+            </div>
+            <!-- Upload progress -->
+            <div class="g-progress" id="g-progress" hidden>
+              <div class="g-progress-bar"><div class="g-progress-fill" id="g-progress-fill"></div></div>
+              <span class="g-progress-text" id="g-progress-text">Uploading...</span>
+            </div>
+          </div>
+
+          <!-- URL INPUT (fallback mode) -->
+          <div class="g-url-input" id="g-url-input" hidden>
             <div class="admin-field">
               <label for="g-url">Image URL</label>
               <input type="url" id="g-url" maxlength="2048" placeholder="https://example.com/photo.jpg" required>
             </div>
+          </div>
+
+          <form id="gallery-admin-form" novalidate>
+            <input type="hidden" id="g-id">
+            <input type="hidden" id="g-file-data" value="">
 
             <div class="admin-field">
               <label for="g-title">Title</label>
