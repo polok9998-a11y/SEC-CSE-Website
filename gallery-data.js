@@ -163,11 +163,15 @@ const GalleryStore = (() => {
     var user = fb.auth.currentUser;
     var uid = user ? user.uid : null;
     var expected = fb.ADMIN_UIDS;
-    console.log('[Gallery] Pre-write auth check (' + (context || 'write') + ') — currentUser:', uid || '(null)', '| Expected admin UIDs:', expected, '| Match:', uid ? expected.indexOf(uid) !== -1 : false);
+    var match = uid ? expected.indexOf(uid) !== -1 : false;
+    console.log('[Gallery] Pre-write auth check (' + (context || 'write') + ') — currentUser:', uid || '(null)', '| Expected admin UIDs:', expected, '| Match:', match);
     if (!user) {
-      console.warn('[Gallery] WARNING: fb.auth.currentUser is null. The Firestore write will use an UNAUTHENTICATED token.');
-    } else if (expected.indexOf(uid) === -1) {
-      console.warn('[Gallery] WARNING: currentUser UID', uid, 'does NOT match any expected admin UID:', expected);
+      console.warn('[Gallery] WARNING: fb.auth.currentUser is null. The Firestore/Storage operation will use an UNAUTHENTICATED token, which will be rejected by isAdmin() rules. Ensure Firebase Auth is initialised and the user is signed in before performing this operation.');
+      console.warn('[Gallery] Auth instance:', fb.auth ? 'OK' : 'MISSING', '| Firestore instance:', fb.db ? 'OK' : 'MISSING', '| Storage instance:', fb.storage ? 'OK' : 'MISSING');
+    } else if (!match) {
+      console.warn('[Gallery] WARNING: currentUser UID', uid, 'does NOT match any expected admin UID:', expected, '. The operation will be rejected by Firestore/Storage security rules.');
+    } else {
+      console.log('[Gallery] Auth OK — UID', uid, 'is an authorized admin. Operation:', context || 'write');
     }
   }
 
@@ -190,8 +194,11 @@ const GalleryStore = (() => {
     if (!path) return Promise.resolve();
     try {
       const fileRef = fb.st.ref(fb.storage, path);
-      return fb.st.deleteObject(fileRef).catch(function () {});
+      return fb.st.deleteObject(fileRef).catch(function (delErr) {
+        console.warn('[Gallery] Storage delete ignored error (file may already be gone):', delErr && delErr.code, delErr && delErr.message);
+      });
     } catch (e) {
+      console.warn('[Gallery] Storage delete threw synchronously:', e && e.message);
       return Promise.resolve();
     }
   }
@@ -206,12 +213,18 @@ const GalleryStore = (() => {
     if (err && err.message && err.message.indexOf('under 10 MB') !== -1) {
       return err.message;
     }
+    if (err && err.message === 'IMAGE_URL_REQUIRED') {
+      return 'Please enter an image URL.';
+    }
     const code = err && err.code;
     if (code === 'permission-denied') return 'You are not allowed to do that. Sign in as the admin first.';
     if (code === 'unavailable' || code === 'network-request-failed') return 'Network problem. Check your internet connection and try again.';
     if (code === 'storage/unauthorized') return 'You are not authorized to upload files. Sign in as the admin first.';
     if (code === 'storage/canceled') return 'Upload was canceled.';
     if (code === 'storage/quota-exceeded') return 'Storage quota exceeded. Please contact support.';
+    if (code === 'storage/object-not-found') return 'The file was not found on the server. It may have been deleted.';
+    if (code === 'storage/retry-limit-exceeded') return 'Too many upload attempts. Please try again later.';
+    if (code === 'failed-precondition') return 'Operation failed. The file may have been modified by another session.';
     return 'Something went wrong. Please try again.';
   }
 
@@ -257,7 +270,14 @@ const GalleryStore = (() => {
       return fb.fs.setDoc(ref, Object.assign({}, record, {
         createdAt: fb.fs.serverTimestamp(),
         updatedAt: fb.fs.serverTimestamp()
-      })).then(() => Object.assign({ id: ref.id }, record));
+      })).then(() => {
+        var saved = Object.assign({ id: ref.id }, record);
+        console.log('[Gallery] Firestore write OK — doc ID:', ref.id, '| category:', record.category || '(none)', '| imageUrl:', record.imageUrl.substring(0, 80));
+        return saved;
+      }).catch(function (err) {
+        console.error('[Gallery] Firestore write FAILED — error:', err && err.code, err && err.message);
+        throw err;
+      });
     },
 
     // Update an existing image by document ID. Returns a Promise.
@@ -274,7 +294,14 @@ const GalleryStore = (() => {
       if ('imageUrl' in clean && !clean.imageUrl) return Promise.reject(new Error('IMAGE_URL_REQUIRED'));
       const ref = fb.fs.doc(fb.db, fb.GALLERY_COLLECTION, String(id));
       return fb.fs.updateDoc(ref, Object.assign({}, clean, { updatedAt: fb.fs.serverTimestamp() }))
-        .then(() => Object.assign({}, cache.find(p => p.id === id) || {}, clean));
+        .then(function () {
+          console.log('[Gallery] Firestore update OK — doc ID:', id, '| changed fields:', Object.keys(clean).join(', ') || '(none)');
+          return Object.assign({}, cache.find(p => p.id === id) || {}, clean);
+        })
+        .catch(function (err) {
+          console.error('[Gallery] Firestore update FAILED — doc ID:', id, '| error:', err && err.code, err && err.message);
+          throw err;
+        });
     },
 
     // Delete an image by document ID. Also removes the Storage file
@@ -286,9 +313,21 @@ const GalleryStore = (() => {
       // Find the storagePath before deleting the Firestore doc.
       const existing = cache.find(p => p.id === id);
       const storagePath = existing ? existing.storagePath : '';
+      console.log('[Gallery] Deleting doc ID:', id, '| storagePath:', storagePath || '(none — URL-only image)');
       const ref = fb.fs.doc(fb.db, fb.GALLERY_COLLECTION, String(id));
       return fb.fs.deleteDoc(ref).then(function () {
+        console.log('[Gallery] Firestore delete OK — doc ID:', id);
+        if (storagePath) {
+          console.log('[Gallery] Deleting Storage file:', storagePath);
+        }
         return deleteStorageFile(fb, storagePath);
+      }).then(function () {
+        if (storagePath) {
+          console.log('[Gallery] Storage delete OK (or file was already gone) — path:', storagePath);
+        }
+      }).catch(function (err) {
+        console.error('[Gallery] Delete FAILED — doc ID:', id, '| error:', err && err.code, err && err.message);
+        throw err;
       });
     },
 
@@ -312,6 +351,8 @@ const GalleryStore = (() => {
       const path = fb.GALLERY_STORAGE_PATH + '/' + filename;
       const fileRef = fb.st.ref(fb.storage, path);
 
+      console.log('[Gallery] Starting upload — filename:', filename, '| storagePath:', path, '| size:', file.size, 'bytes | type:', file.type);
+
       return new Promise(function (resolve, reject) {
         const uploadTask = fb.st.uploadBytes(fileRef, file, {
           contentType: file.type
@@ -322,11 +363,13 @@ const GalleryStore = (() => {
         // so we use uploadBytesResumable for progress if available,
         // falling back to uploadBytes.
         uploadTask.then(function (snapshot) {
+          console.log('[Gallery] Storage upload OK — ref:', snapshot.ref ? 'OK' : 'MISSING', '| bytes:', file.size);
           if (onProgress) {
             onProgress({ bytesTransferred: file.size, totalBytes: file.size });
           }
           return fb.st.getDownloadURL(snapshot.ref);
         }).then(function (downloadURL) {
+          console.log('[Gallery] Download URL obtained:', downloadURL ? downloadURL.substring(0, 80) + '...' : '(empty)');
           const record = {
             imageUrl: downloadURL,
             title: String(metadata.title || '').trim(),
@@ -340,9 +383,12 @@ const GalleryStore = (() => {
             createdAt: fb.fs.serverTimestamp(),
             updatedAt: fb.fs.serverTimestamp()
           })).then(function () {
-            resolve(Object.assign({ id: docRef.id }, record));
+            var saved = Object.assign({ id: docRef.id }, record);
+            console.log('[Gallery] Firestore write OK after upload — doc ID:', docRef.id, '| category:', record.category || '(none)');
+            resolve(saved);
           });
         }).catch(function (err) {
+          console.error('[Gallery] Upload FAILED — error:', err && err.code, err && err.message);
           // Clean up the Storage file if Firestore save failed.
           deleteStorageFile(fb, path);
           reject(err);

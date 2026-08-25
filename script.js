@@ -760,6 +760,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // UID of the signed-in account while it is an authorized admin,
+  // otherwise null. This is a FAST client-side guard only — the real
+  // enforcement happens in firestore.rules on Google's servers.
+  // Shared by both the Notice Admin Panel and the Gallery Admin Panel.
+  let signedInAdminUid = null;
+
   // ===== 12. NOTICE ADMIN PANEL — FIREBASE AUTH + FIRESTORE (admin.html) =====
   const adminForm = document.getElementById('admin-notice-form');
   if (adminForm && window.NoticeStore) {
@@ -788,10 +794,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const userEmailEl = document.getElementById('admin-user-email');
     const logoutBtn = document.getElementById('admin-logout');
 
-    // UID of the signed-in account while it is an authorized admin,
-    // otherwise null. This is a FAST client-side guard only — the real
-    // enforcement happens in firestore.rules on Google's servers.
-    let signedInAdminUid = null;
+    // UID of the signed-in admin account. Shared with Gallery Admin Panel.
 
     // Fail-fast check used before every write request. Fails closed:
     // until Firebase Auth confirms an authorized admin, nothing is sent.
@@ -1016,6 +1019,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       // Keep the write-guard in sync with the real auth state.
       signedInAdminUid = isAdmin ? uid : null;
+      // Reset gallery form when auth state changes (sign-in / sign-out).
+      if (typeof resetGalleryForm === 'function') resetGalleryForm();
       if (!user) {
         showView('login');
         setAuthStatus('');
@@ -1124,45 +1129,20 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentMode = 'upload'; // 'upload' or 'url'
     let selectedFile = null;
 
-    // Client-side fail-fast guard for gallery writes — mirrors the notice
-    // panel guard above. Real enforcement lives in firestore.rules.
-    let signedInGalleryAdmin = false;
-
-    function requireGalleryAdminSignIn() {
-      if (signedInGalleryAdmin) return true;
-      setGalleryStatus('Please sign in as the admin first.', true);
-      return false;
-    }
-
-    // Watches Firebase Auth state once firebase-config.js finishes loading
-    // the SDK. Fails closed: while nobody (or a non-admin) is signed in,
-    // every gallery write is blocked locally before any request is sent.
-    function watchGalleryAuth() {
-      const fb = window.NoticeFirebase;
-      if (!fb || !fb.ready) {
-        document.addEventListener('noticefirebase:ready', function onReady() {
-          document.removeEventListener('noticefirebase:ready', onReady);
-    watchGalleryAuth();
+    // Gallery admin writes reuse the same signedInAdminUid guard as the
+    // Notice panel (Section 12). Real enforcement lives in firestore.rules.
 
     function logGalleryError(err, context) {
       var fb = window.NoticeFirebase;
       var authUser = fb && fb.auth ? fb.auth.currentUser : null;
       console.error('[Admin] Gallery ' + (context || 'operation') + ' failed:', err && err.code, err && err.message);
-      console.error('[Admin] Diagnostic — isGalleryAdmin:', signedInGalleryAdmin, '| auth.currentUser:', authUser ? authUser.uid : '(null)', '| Expected UIDs:', fb ? fb.ADMIN_UIDS : '(N/A)');
+      console.error('[Admin] Diagnostic — signedInAdminUid:', signedInAdminUid, '| auth.currentUser:', authUser ? authUser.uid : '(null)', '| Expected UIDs:', fb ? fb.ADMIN_UIDS : '(N/A)');
       if (err && (err.code === 'permission-denied' || err.code === 'storage/unauthorized')) {
         console.error('[Admin] CAUSE: Firebase server rejected the write. The security rules deployed on Firebase do NOT allow this UID to write.');
         console.error('[Admin] FIX: Go to Firebase Console → Firestore Database → Rules tab AND Storage → Rules tab. Paste the full content of firestore.rules and storage.rules respectively. Click Publish on both.');
         console.error('[Admin] ALSO CHECK: Firebase Console → Authentication → Users tab → verify your admin user has UID ASoDradWjJhgYA7a73q091YOSeY2.');
       }
     }
-        });
-        return;
-      }
-      fb.authApi.onAuthStateChanged(fb.auth, user => {
-        signedInGalleryAdmin = !!user && fb.isAdminUid(user.uid);
-      });
-    }
-    watchGalleryAuth();
 
     function setGalleryStatus(message, isError) {
       gStatusEl.textContent = message;
@@ -1292,7 +1272,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     galleryForm.addEventListener('submit', function (e) {
       e.preventDefault();
-      if (!requireGalleryAdminSignIn()) return;
+      if (!signedInAdminUid) {
+        setGalleryStatus('Please sign in as the admin first.', true);
+        return;
+      }
 
       var editId = gFields.id.value;
       var metadata = {
@@ -1400,7 +1383,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const id = row.dataset.id;
 
       if (e.target.classList.contains('delete')) {
-        if (!requireGalleryAdminSignIn()) return;
+        if (!signedInAdminUid) {
+          setGalleryStatus('Please sign in as the admin first.', true);
+          return;
+        }
         if (window.confirm('Delete this gallery image permanently?')) {
           if (gFields.id.value === id) resetGalleryForm();
           e.target.disabled = true;
