@@ -165,6 +165,7 @@ console.log('[Firebase] Project:', firebaseConfig.projectId, '| Expected admin U
       st: {
         ref: storageMod.ref,
         uploadBytes: storageMod.uploadBytes,
+        uploadBytesResumable: storageMod.uploadBytesResumable,
         getDownloadURL: storageMod.getDownloadURL,
         deleteObject: storageMod.deleteObject
       },

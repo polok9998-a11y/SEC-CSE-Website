@@ -354,45 +354,55 @@ const GalleryStore = (() => {
       console.log('[Gallery] Starting upload — filename:', filename, '| storagePath:', path, '| size:', file.size, 'bytes | type:', file.type);
 
       return new Promise(function (resolve, reject) {
-        const uploadTask = fb.st.uploadBytes(fileRef, file, {
+        const uploadTask = fb.st.uploadBytesResumable(fileRef, file, {
           contentType: file.type
         });
 
-        // Track progress if a callback was provided.
-        // Note: uploadBytes returns a Promise, not a task with on() —
-        // so we use uploadBytesResumable for progress if available,
-        // falling back to uploadBytes.
-        uploadTask.then(function (snapshot) {
-          console.log('[Gallery] Storage upload OK — ref:', snapshot.ref ? 'OK' : 'MISSING', '| bytes:', file.size);
-          if (onProgress) {
-            onProgress({ bytesTransferred: file.size, totalBytes: file.size });
+        uploadTask.on('state_changed',
+          // Progress handler — called repeatedly during upload
+          function (snapshot) {
+            if (onProgress) {
+              onProgress({ bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
+            }
+          },
+          // Error handler — called if the upload fails
+          function (error) {
+            console.error('[Gallery] Upload FAILED — error:', error && error.code, error && error.message);
+            reject(error);
+          },
+          // Complete handler — called when upload finishes successfully
+          function () {
+            console.log('[Gallery] Storage upload OK — bytes:', file.size);
+            if (onProgress) {
+              onProgress({ bytesTransferred: file.size, totalBytes: file.size });
+            }
+            fb.st.getDownloadURL(uploadTask.snapshot.ref).then(function (downloadURL) {
+              console.log('[Gallery] Download URL obtained:', downloadURL ? downloadURL.substring(0, 80) + '...' : '(empty)');
+              const record = {
+                imageUrl: downloadURL,
+                title: String(metadata.title || '').trim(),
+                caption: String(metadata.caption || '').trim(),
+                category: String(metadata.category || '').trim().toLowerCase(),
+                order: normalizeOrder(metadata.order),
+                storagePath: path
+              };
+              const docRef = fb.fs.doc(fb.db, fb.GALLERY_COLLECTION);
+              return fb.fs.setDoc(docRef, Object.assign({}, record, {
+                createdAt: fb.fs.serverTimestamp(),
+                updatedAt: fb.fs.serverTimestamp()
+              })).then(function () {
+                var saved = Object.assign({ id: docRef.id }, record);
+                console.log('[Gallery] Firestore write OK after upload — doc ID:', docRef.id, '| category:', record.category || '(none)');
+                resolve(saved);
+              });
+            }).catch(function (err) {
+              console.error('[Gallery] Post-upload FAILED — error:', err && err.code, err && err.message);
+              // Clean up the Storage file if Firestore save failed.
+              deleteStorageFile(fb, path);
+              reject(err);
+            });
           }
-          return fb.st.getDownloadURL(snapshot.ref);
-        }).then(function (downloadURL) {
-          console.log('[Gallery] Download URL obtained:', downloadURL ? downloadURL.substring(0, 80) + '...' : '(empty)');
-          const record = {
-            imageUrl: downloadURL,
-            title: String(metadata.title || '').trim(),
-            caption: String(metadata.caption || '').trim(),
-            category: String(metadata.category || '').trim().toLowerCase(),
-            order: normalizeOrder(metadata.order),
-            storagePath: path
-          };
-          const docRef = fb.fs.doc(fb.db, fb.GALLERY_COLLECTION);
-          return fb.fs.setDoc(docRef, Object.assign({}, record, {
-            createdAt: fb.fs.serverTimestamp(),
-            updatedAt: fb.fs.serverTimestamp()
-          })).then(function () {
-            var saved = Object.assign({ id: docRef.id }, record);
-            console.log('[Gallery] Firestore write OK after upload — doc ID:', docRef.id, '| category:', record.category || '(none)');
-            resolve(saved);
-          });
-        }).catch(function (err) {
-          console.error('[Gallery] Upload FAILED — error:', err && err.code, err && err.message);
-          // Clean up the Storage file if Firestore save failed.
-          deleteStorageFile(fb, path);
-          reject(err);
-        });
+        );
       });
     },
 
