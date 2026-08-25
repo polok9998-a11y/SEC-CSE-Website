@@ -240,8 +240,18 @@
 
             <div class="admin-field-row">
               <div class="admin-field">
-                <label for="g-category">Category (optional)</label>
-                <input type="text" id="g-category" maxlength="40" placeholder="e.g. events">
+                <label for="g-category">Category</label>
+                <select id="g-category">
+                  <option value="">None</option>
+                  <option value="events">Events</option>
+                  <option value="classes">Classes</option>
+                  <option value="workshops">Workshops</option>
+                  <option value="seminars">Seminars</option>
+                  <option value="competitions">Competitions</option>
+                  <option value="campus life">Campus Life</option>
+                  <option value="achievements">Achievements</option>
+                  <option value="other">Other</option>
+                </select>
               </div>
               <div class="admin-field">
                 <label for="g-order">Display Order</label>
