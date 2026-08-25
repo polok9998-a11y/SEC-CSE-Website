@@ -176,6 +176,21 @@ const NoticeStore = (() => {
     return fb;
   }
 
+  // Pre-write diagnostic: verify the Auth instance has a currentUser
+  // whose UID matches the expected admin UID. This catches the common
+  // case where onAuthStateChanged hasn't fired yet or the UID is wrong.
+  function requireAdminAuth(fb) {
+    var user = fb.auth.currentUser;
+    var uid = user ? user.uid : null;
+    var expected = fb.ADMIN_UIDS;
+    console.log('[Notices] Pre-write auth check — currentUser:', uid || '(null)', '| Expected admin UIDs:', expected, '| Match:', uid ? expected.indexOf(uid) !== -1 : false);
+    if (!user) {
+      console.warn('[Notices] WARNING: fb.auth.currentUser is null. The Firestore write will use an UNAUTHENTICATED token, which will be rejected by isAdmin() rules.');
+    } else if (expected.indexOf(uid) === -1) {
+      console.warn('[Notices] WARNING: currentUser UID', uid, 'does NOT match any expected admin UID:', expected, '. The Firestore write will be rejected.');
+    }
+  }
+
   function friendly(err) {
     if (err && err.message === 'DUPLICATE') {
       return 'An identical notice already exists on the board.';
@@ -222,6 +237,7 @@ const NoticeStore = (() => {
     add(data) {
       let fb;
       try { fb = requireFb(); } catch (e) { return Promise.reject(e); }
+      requireAdminAuth(fb);
       const record = {
         date: data.date,
         title: data.title,
@@ -244,6 +260,7 @@ const NoticeStore = (() => {
     update(id, changes) {
       let fb;
       try { fb = requireFb(); } catch (e) { return Promise.reject(e); }
+      requireAdminAuth(fb);
       const clean = {};
       if ('date' in changes) clean.date = changes.date;
       if ('title' in changes) clean.title = changes.title;
@@ -258,6 +275,7 @@ const NoticeStore = (() => {
     remove(id) {
       let fb;
       try { fb = requireFb(); } catch (e) { return Promise.reject(e); }
+      requireAdminAuth(fb);
       return fb.fs.deleteDoc(fb.fs.doc(fb.db, fb.COLLECTION, String(id)));
     },
 

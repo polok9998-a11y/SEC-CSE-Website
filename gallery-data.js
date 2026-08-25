@@ -159,6 +159,18 @@ const GalleryStore = (() => {
     return fb;
   }
 
+  function requireAdminAuth(fb, context) {
+    var user = fb.auth.currentUser;
+    var uid = user ? user.uid : null;
+    var expected = fb.ADMIN_UIDS;
+    console.log('[Gallery] Pre-write auth check (' + (context || 'write') + ') — currentUser:', uid || '(null)', '| Expected admin UIDs:', expected, '| Match:', uid ? expected.indexOf(uid) !== -1 : false);
+    if (!user) {
+      console.warn('[Gallery] WARNING: fb.auth.currentUser is null. The Firestore write will use an UNAUTHENTICATED token.');
+    } else if (expected.indexOf(uid) === -1) {
+      console.warn('[Gallery] WARNING: currentUser UID', uid, 'does NOT match any expected admin UID:', expected);
+    }
+  }
+
   function normalizeOrder(value) {
     if (value === null || value === undefined || String(value).trim() === '') return null;
     const n = Number(value);
@@ -229,6 +241,7 @@ const GalleryStore = (() => {
     add(data) {
       let fb;
       try { fb = requireFb(); } catch (e) { return Promise.reject(e); }
+      requireAdminAuth(fb, 'add');
       const record = {
         imageUrl: String(data.imageUrl || '').trim(),
         title: String(data.title || '').trim(),
@@ -251,6 +264,7 @@ const GalleryStore = (() => {
     update(id, changes) {
       let fb;
       try { fb = requireFb(); } catch (e) { return Promise.reject(e); }
+      requireAdminAuth(fb, 'update');
       const clean = {};
       if ('imageUrl' in changes) clean.imageUrl = String(changes.imageUrl || '').trim();
       if ('title' in changes) clean.title = String(changes.title || '').trim();
@@ -268,6 +282,7 @@ const GalleryStore = (() => {
     remove(id) {
       let fb;
       try { fb = requireFb(); } catch (e) { return Promise.reject(e); }
+      requireAdminAuth(fb, 'delete');
       // Find the storagePath before deleting the Firestore doc.
       const existing = cache.find(p => p.id === id);
       const storagePath = existing ? existing.storagePath : '';
@@ -285,6 +300,7 @@ const GalleryStore = (() => {
     uploadFile(file, metadata, onProgress) {
       let fb;
       try { fb = requireFb(); } catch (e) { return Promise.reject(e); }
+      requireAdminAuth(fb, 'upload');
       if (!file || !file.type || !file.type.startsWith('image/')) {
         return Promise.reject(new Error('Please select an image file (JPEG, PNG, GIF, WebP).'));
       }

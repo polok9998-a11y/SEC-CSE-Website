@@ -43,6 +43,8 @@ const ADMIN_UIDS = [
   "ASoDradWjJhgYA7a73q091YOSeY2"
 ];
 
+console.log('[Firebase] Project:', firebaseConfig.projectId, '| Expected admin UIDs:', ADMIN_UIDS);
+
 // ============================================================
 // Everything below initialises Firebase and exposes a small
 // API (window.NoticeFirebase) for the rest of the site.
@@ -115,6 +117,19 @@ const ADMIN_UIDS = [
     const db = fs.getFirestore(firebaseApp);
     const auth = authMod.getAuth(firebaseApp);
     const storage = storageMod.getStorage(firebaseApp);
+
+    console.log('[Firebase] App initialised — project:', firebaseConfig.projectId);
+    console.log('[Firebase] Auth instance:', auth ? 'OK' : 'MISSING', '| Firestore instance:', db ? 'OK' : 'MISSING', '| Storage instance:', storage ? 'OK' : 'MISSING');
+    console.log('[Firebase] Auth currentUser on init:', auth.currentUser ? auth.currentUser.uid : '(null — will resolve asynchronously)');
+
+    // Listen for auth changes to log runtime UID
+    authMod.onAuthStateChanged(auth, function (user) {
+      if (user) {
+        console.log('[Firebase] Auth user signed in — UID:', user.uid, '| Email:', user.email, '| Is expected admin:', ADMIN_UIDS.indexOf(user.uid) !== -1);
+      } else {
+        console.log('[Firebase] Auth state: no user signed in');
+      }
+    });
 
     window.NoticeFirebase = {
       ready: true,

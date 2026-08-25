@@ -866,6 +866,15 @@ document.addEventListener('DOMContentLoaded', () => {
           setStatus('Notice added. It is now live on the Notice Board and Home Page.');
         }
       }).catch(err => {
+        var fb = window.NoticeFirebase;
+        var authUser = fb && fb.auth ? fb.auth.currentUser : null;
+        console.error('[Admin] Notice write failed:', err && err.code, err && err.message);
+        console.error('[Admin] Diagnostic — signedInAdminUid:', signedInAdminUid, '| auth.currentUser:', authUser ? authUser.uid : '(null)', '| Expected UIDs:', fb ? fb.ADMIN_UIDS : '(N/A)');
+        if (err && err.code === 'permission-denied') {
+          console.error('[Admin] CAUSE: Firestore server rejected the write. The Firestore security rules deployed on Firebase do NOT allow this UID to write.');
+          console.error('[Admin] FIX: Go to Firebase Console → Firestore Database → Rules tab. Paste the full content of firestore.rules (with the UID ASoDradWjJhgYA7a73q091YOSeY2). Click Publish.');
+          console.error('[Admin] ALSO CHECK: Firebase Console → Authentication → Users tab → verify your admin user has UID ASoDradWjJhgYA7a73q091YOSeY2. If not, update ADMIN_UIDS and firestore.rules with the correct UID.');
+        }
         setStatus(NoticeStore.messageFor ? NoticeStore.messageFor(err) : 'Could not save the notice. Please try again.', true);
       }).finally(() => {
         submitBtn.disabled = false;
@@ -888,6 +897,7 @@ document.addEventListener('DOMContentLoaded', () => {
           NoticeStore.remove(id)
             .then(() => setStatus('Notice deleted from the board.'))
             .catch(err => {
+              console.error('[Admin] Notice delete failed:', err && err.code, err && err.message, '| Signed-in UID:', signedInAdminUid);
               setStatus(NoticeStore.messageFor ? NoticeStore.messageFor(err) : 'Could not delete the notice. Please try again.', true);
               e.target.disabled = false;
             });
@@ -996,14 +1006,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyAuthState(fb, user) {
+      var uid = user ? user.uid : null;
+      var isAdmin = uid ? fb.isAdminUid(uid) : false;
+      var liveCurrentUser = fb.auth.currentUser;
+      var liveUid = liveCurrentUser ? liveCurrentUser.uid : null;
+      console.log('[Admin] applyAuthState — callback user UID:', uid || '(none)', '| fb.auth.currentUser UID:', liveUid || '(none)', '| isAdmin:', isAdmin, '| Expected:', fb.ADMIN_UIDS);
+      if (uid && uid !== liveUid) {
+        console.warn('[Admin] MISMATCH: onAuthStateChanged UID', uid, '!= fb.auth.currentUser UID', liveUid, '. Auth state may be inconsistent.');
+      }
       // Keep the write-guard in sync with the real auth state.
-      signedInAdminUid = (user && fb.isAdminUid(user.uid)) ? user.uid : null;
+      signedInAdminUid = isAdmin ? uid : null;
       if (!user) {
         showView('login');
         setAuthStatus('');
         return;
       }
       if (!fb.isAdminUid(user.uid)) {
+        console.warn('[Admin] Signed-in UID', uid, 'does not match any expected admin UID:', fb.ADMIN_UIDS);
         const unauthEmail = document.getElementById('admin-unauthorized-email');
         if (unauthEmail) unauthEmail.textContent = user.email || '';
         showView('unauthorized');
@@ -1014,6 +1033,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     whenFirebaseReady().then(fb => {
+      // ── Comprehensive auth-Firestore linkage diagnostic ──
+      console.log('[Admin] Firebase ready — app.name:', fb.app.name, '| projectId:', fb.app.options.projectId);
+      console.log('[Admin] Auth instance:', fb.auth ? 'OK (uid at init: ' + (fb.auth.currentUser ? fb.auth.currentUser.uid : 'null') + ')' : 'MISSING');
+      console.log('[Admin] Firestore instance:', fb.db ? 'OK' : 'MISSING');
+      console.log('[Admin] Expected admin UIDs:', fb.ADMIN_UIDS);
+
+      // The first onAuthStateChanged callback fires SYNCHRONOUSLY with the
+      // current auth state. If the user is already signed in (persisted session),
+      // applyAuthState will set signedInAdminUid and show the panel immediately.
       fb.authApi.onAuthStateChanged(fb.auth, user => applyAuthState(fb, user));
 
       if (loginForm) {
@@ -1114,7 +1142,19 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!fb || !fb.ready) {
         document.addEventListener('noticefirebase:ready', function onReady() {
           document.removeEventListener('noticefirebase:ready', onReady);
-          watchGalleryAuth();
+    watchGalleryAuth();
+
+    function logGalleryError(err, context) {
+      var fb = window.NoticeFirebase;
+      var authUser = fb && fb.auth ? fb.auth.currentUser : null;
+      console.error('[Admin] Gallery ' + (context || 'operation') + ' failed:', err && err.code, err && err.message);
+      console.error('[Admin] Diagnostic — isGalleryAdmin:', signedInGalleryAdmin, '| auth.currentUser:', authUser ? authUser.uid : '(null)', '| Expected UIDs:', fb ? fb.ADMIN_UIDS : '(N/A)');
+      if (err && (err.code === 'permission-denied' || err.code === 'storage/unauthorized')) {
+        console.error('[Admin] CAUSE: Firebase server rejected the write. The security rules deployed on Firebase do NOT allow this UID to write.');
+        console.error('[Admin] FIX: Go to Firebase Console → Firestore Database → Rules tab AND Storage → Rules tab. Paste the full content of firestore.rules and storage.rules respectively. Click Publish on both.');
+        console.error('[Admin] ALSO CHECK: Firebase Console → Authentication → Users tab → verify your admin user has UID ASoDradWjJhgYA7a73q091YOSeY2.');
+      }
+    }
         });
         return;
       }
@@ -1284,6 +1324,7 @@ document.addEventListener('DOMContentLoaded', () => {
             resetGalleryForm();
             setGalleryStatus('Image updated. The public Gallery page is in sync.');
           }).catch(function (err) {
+            logGalleryError(err, 'update');
             setGalleryStatus(GalleryStore.messageFor(err), true);
           }).finally(function () {
             gSubmitBtn.disabled = false;
@@ -1295,6 +1336,7 @@ document.addEventListener('DOMContentLoaded', () => {
             resetGalleryForm();
             setGalleryStatus('Image updated. The public Gallery page is in sync.');
           }).catch(function (err) {
+            logGalleryError(err, 'update-metadata');
             setGalleryStatus(GalleryStore.messageFor(err), true);
           }).finally(function () {
             gSubmitBtn.disabled = false;
@@ -1316,6 +1358,7 @@ document.addEventListener('DOMContentLoaded', () => {
           setGalleryStatus('Image uploaded successfully. It is now live on the public Gallery page.');
         }).catch(function (err) {
           hideUploadProgress();
+          logGalleryError(err, 'upload');
           setGalleryStatus(GalleryStore.messageFor(err), true);
         }).finally(function () {
           gSubmitBtn.disabled = false;
@@ -1334,6 +1377,7 @@ document.addEventListener('DOMContentLoaded', () => {
           resetGalleryForm();
           setGalleryStatus('Image added. It is now live on the public Gallery page.');
         }).catch(function (err) {
+          logGalleryError(err, 'add');
           var msg = GalleryStore.messageFor(err);
           if (err && err.message === 'IMAGE_URL_REQUIRED') msg = 'Please enter an image URL.';
           setGalleryStatus(msg, true);
@@ -1363,6 +1407,7 @@ document.addEventListener('DOMContentLoaded', () => {
           GalleryStore.remove(id)
             .then(() => setGalleryStatus('Image deleted from the gallery.'))
             .catch(err => {
+              logGalleryError(err, 'delete');
               setGalleryStatus(GalleryStore.messageFor(err), true);
               e.target.disabled = false;
             });
