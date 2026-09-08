@@ -40,7 +40,7 @@
 
   /* smooth theme switch for plain containers (no other transitions of their own) */
   .top-bar, header, nav, footer, .gallery-bg,
-  .members-stats, .upcoming-card, .contact-card,
+  .members-stats, .contact-card,
   .notice-date, .contact-icon, .uni-seal {
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
   }
@@ -615,7 +615,7 @@
   /* ── NOTICES ── */
   .notices-grid {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: 1fr;
     gap: 28px;
     align-items: start;
   }
@@ -637,6 +637,7 @@
     color: var(--white);
     padding: 8px 4px;
     align-self: flex-start;
+    overflow: hidden;
   }
 
   .notice-date .day {
@@ -645,7 +646,9 @@
     font-size: 1.4rem;
     font-weight: 700;
     color: var(--gold-light);
-    line-height: 1;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .notice-date .month {
@@ -655,6 +658,8 @@
     letter-spacing: 0.08em;
     color: #8898b8;
     margin-top: 2px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .notice-body { flex: 1; }
@@ -685,45 +690,6 @@
   .notice-pill.exam { background: #8b1a1a; color: var(--white); }
   .notice-pill.event { background: var(--gold); color: var(--navy); }
   .notice-pill.notice { background: var(--navy); color: var(--gold); }
-
-  .upcoming-card {
-    background: var(--white);
-    border: 1px solid var(--border-color);
-    border-left: 4px solid var(--gold);
-    padding: 20px;
-  }
-
-  .upcoming-card h4 {
-    font-family: 'Merriweather', serif;
-    font-size: 1rem;
-    color: var(--heading-text);
-    margin-bottom: 16px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--gray-300);
-  }
-
-  .upcoming-event {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 14px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid var(--gray-100);
-  }
-
-  .upcoming-event:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-
-  .event-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--gold);
-    flex-shrink: 0;
-    margin-top: 5px;
-  }
-
-  .event-info { font-size: 0.85rem; }
-  .event-info strong { display: block; color: var(--heading-text); font-weight: 700; }
-  .event-info span { color: var(--gray-500); font-size: 0.78rem; }
 
   /* ── CONTACT ── */
   .contact-bg { background: var(--gray-100); border-top: 1px solid var(--gray-300); }
