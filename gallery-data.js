@@ -58,6 +58,7 @@ const GalleryStore = (() => {
 
   // ── state ────────────────────────────────────────────────────
   let items;                              // working copy of GALLERY_DATA
+  let originalItems = [];                 // snapshot of GALLERY_DATA at load — never removed
   const dataProblems = [];                // invalid entries found in the data file
   const changeListeners = [];
   let started = false;
@@ -114,6 +115,7 @@ const GalleryStore = (() => {
       valid.push(entry);
     });
     items = valid;
+    originalItems = valid.slice();
   }
 
   function emitChange() {
@@ -185,8 +187,20 @@ const GalleryStore = (() => {
 
   // The exact data block that must replace the block between the
   // BEGIN/END GALLERY DATA markers in gallery-data.js.
+  // Merges originalItems (never removed) with current items (new additions).
   function generateDataBlock() {
-    const entries = sortByOrder(items).map(formatEntry).join(',\n');
+    const merged = [];
+    const seen = new Set();
+
+    originalItems.forEach(function (e) {
+      if (!seen.has(e.id)) { merged.push(e); seen.add(e.id); }
+    });
+
+    items.forEach(function (e) {
+      if (!seen.has(e.id)) { merged.push(e); seen.add(e.id); }
+    });
+
+    const entries = sortByOrder(merged).map(formatEntry).join(',\n');
     return '// ==== BEGIN GALLERY DATA ====\n' +
       'const GALLERY_DATA = [\n' +
       (entries ? entries + '\n' : '') +
