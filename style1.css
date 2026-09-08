@@ -630,12 +630,14 @@
   }
 
   .notice-date {
-    flex-shrink: 0;
-    width: 52px;
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 60px;
+    max-width: 84px;
     text-align: center;
     background: var(--navy);
     color: var(--white);
-    padding: 8px 4px;
+    padding: 10px 8px;
     align-self: flex-start;
     overflow: hidden;
   }
@@ -647,19 +649,17 @@
     font-weight: 700;
     color: var(--gold-light);
     line-height: 1.1;
-    overflow-wrap: anywhere;
-    word-break: break-word;
+    white-space: nowrap;
   }
 
   .notice-date .month {
     display: block;
-    font-size: 0.65rem;
+    font-size: 0.62rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: #8898b8;
-    margin-top: 2px;
-    overflow-wrap: anywhere;
-    word-break: break-word;
+    margin-top: 3px;
+    white-space: nowrap;
   }
 
   .notice-body { flex: 1; }
