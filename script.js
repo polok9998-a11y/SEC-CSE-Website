@@ -140,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ===== 2. GALLERY LIGHTBOX (gallery.html) =====
-  // Delegated on .gallery-grid, so it works for the Firestore-rendered
+  // Delegated on .gallery-grid, so it works for the data-rendered
   // items as well as any static emoji tiles.
   const galleryGridForLightbox = document.querySelector('.gallery-grid');
   if (galleryGridForLightbox) {
@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     galleryGridForLightbox.addEventListener('click', e => {
       const item = e.target.closest('.gallery-item');
-      if (!item || item.classList.contains('gallery-skeleton')) return;
+      if (!item) return;
 
       content.textContent = '';
 
@@ -591,10 +591,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // ===== 11. PUBLIC GALLERY — FIRESTORE RENDERING + FILTER (gallery.html) =====
+  // ===== 11. PUBLIC GALLERY — STATIC DATA + FILTER (gallery.html) =====
   // Fills [data-gallery-grid] from the shared GalleryStore (gallery-data.js).
-  // Admin adds/edits/deletes images in admin.html; this grid updates
-  // automatically through the same real-time listener.
+  // There is no Firebase or Firestore in the Gallery — the admin edits data
+  // in admin.html, generates the updated gallery-data.js, commits the file
+  // and GitHub Pages serves it. The page re-renders immediately on change.
   const galleryGrid = document.querySelector('[data-gallery-grid]');
   if (galleryGrid && window.GalleryStore) {
 
@@ -619,14 +620,13 @@ document.addEventListener('DOMContentLoaded', () => {
       img.loading = 'lazy';
       img.src = photo.imageUrl;
       img.alt = photo.title || photo.caption || 'Gallery photo';
-      // Graceful fallback for invalid/broken image URLs.
       img.addEventListener('error', () => {
         img.remove();
         item.classList.add('broken');
         if (!item.querySelector('.gallery-emoji')) {
           const fallback = document.createElement('span');
           fallback.className = 'gallery-emoji';
-          fallback.textContent = '\u{1F5BC}\uFE0F'; // framed picture
+          fallback.textContent = '\u{1F5BC}\uFE0F';
           item.insertBefore(fallback, item.firstChild);
         }
       });
@@ -643,8 +643,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return item;
     }
 
-    // Rebuilds the category filter bar from the live data (same
-    // .filter-bar / .filter-btn design as the Notice Board).
     function rebuildGalleryFilter(photos) {
       if (galleryFilterBar) { galleryFilterBar.remove(); galleryFilterBar = null; }
 
@@ -689,14 +687,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function applyGalleryFilter() {
       galleryGrid.querySelectorAll('.gallery-item').forEach(item => {
-        if (item.classList.contains('gallery-skeleton')) return;
         const match = currentFilter === 'all' || item.dataset.category === currentFilter;
         item.style.display = match ? '' : 'none';
       });
     }
 
-    // Same conditions as the scroll-reveal section — only animate when the
-    // reveal observer will actually be able to run.
     function canAnimateReveal() {
       return 'IntersectionObserver' in window &&
         !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -704,30 +699,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let firstRender = true;
     function renderPublicGallery() {
-      const status = GalleryStore.getStatus();
-      const photos = GalleryStore.getAll().filter(p => p.imageUrl);
-
-      if (status === 'loading') {
-        galleryGrid.textContent = '';
-        for (let i = 0; i < 7; i++) {
-          const skeleton = document.createElement('div');
-          skeleton.className = 'gallery-item gallery-skeleton';
-          skeleton.setAttribute('aria-hidden', 'true');
-          galleryGrid.appendChild(skeleton);
-        }
-        return;
-      }
+      const photos = GalleryStore.getAll();
+      const problems = GalleryStore.getDataProblems();
 
       galleryGrid.textContent = '';
 
-      if (status === 'error') {
-        galleryGrid.appendChild(showGalleryMessage('Unable to load the gallery right now. Please try again later.'));
-        rebuildGalleryFilter([]);
-        return;
-      }
-
       if (photos.length === 0) {
-        galleryGrid.appendChild(showGalleryMessage('No photos have been added yet.'));
+        const msg = problems.length
+          ? 'The gallery data file contains entries that could not be loaded — check gallery-data.js or the admin panel.'
+          : 'No photos have been added yet.';
+        galleryGrid.appendChild(showGalleryMessage(msg));
         rebuildGalleryFilter([]);
         return;
       }
@@ -741,8 +722,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       firstRender = false;
 
-      // Items appear after the reveal observer was created — register them
-      // for the same reveal animation as everything else.
       if (registerRevealEls && renderedItems.length) {
         registerRevealEls(renderedItems);
       }
@@ -751,13 +730,8 @@ document.addEventListener('DOMContentLoaded', () => {
       applyGalleryFilter();
     }
 
+    renderPublicGallery();
     GalleryStore.onChange(renderPublicGallery);
-
-    if (GalleryStore.getStatus() === 'ready' || GalleryStore.getStatus() === 'error') {
-      renderPublicGallery();
-    } else {
-      GalleryStore.ready().then(renderPublicGallery).catch(renderPublicGallery);
-    }
   }
 
   // UID of the signed-in account while it is an authorized admin,
@@ -765,6 +739,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // enforcement happens in firestore.rules on Google's servers.
   // Shared by both the Notice Admin Panel and the Gallery Admin Panel.
   let signedInAdminUid = null;
+
+  // Hook for the Gallery admin form reset. Declared here (outer scope) so the
+  // Notice auth gate in Section 12 can reset the Gallery form on auth changes,
+  // even though the form lives in a sibling block in Section 13.
+  let resetGalleryFormGlobal = null;
 
   // ===== 12. NOTICE ADMIN PANEL — FIREBASE AUTH + FIRESTORE (admin.html) =====
   const adminForm = document.getElementById('admin-notice-form');
@@ -1020,7 +999,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Keep the write-guard in sync with the real auth state.
       signedInAdminUid = isAdmin ? uid : null;
       // Reset gallery form when auth state changes (sign-in / sign-out).
-      if (typeof resetGalleryForm === 'function') resetGalleryForm();
+      if (resetGalleryFormGlobal) resetGalleryFormGlobal();
       if (!user) {
         showView('login');
         setAuthStatus('');
@@ -1093,8 +1072,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ===== 13. GALLERY ADMIN PANEL (admin.html) =====
   // Lives inside the same #admin-panel auth gate as the notice tools, so it
-  // is only visible to the signed-in admin. Writes are additionally
-  // protected server-side by firestore.rules.
+  // is only visible to the signed-in admin. Writes operate against the
+  // in-memory gallery data; publishing happens by committing the generated
+  // gallery-data.js file to GitHub.
   const galleryForm = document.getElementById('gallery-admin-form');
   if (galleryForm && window.GalleryStore) {
     const gFields = {
@@ -1126,6 +1106,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const gModeUpload = document.getElementById('g-mode-upload');
     const gModeUrl = document.getElementById('g-mode-url');
 
+    // Publish-to-GitHub (generated gallery-data.js) elements
+    const gDataGenerate = document.getElementById('g-data-generate');
+    const gDataCopy = document.getElementById('g-data-copy');
+    const gDataDownload = document.getElementById('g-data-download');
+    const gDataOutput = document.getElementById('g-data-output');
+    const gDataStatusEl = document.getElementById('g-data-status');
+    const gDataCount = document.getElementById('g-data-count');
+
     let currentMode = 'upload'; // 'upload' or 'url'
     let selectedFile = null;
 
@@ -1133,14 +1121,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Notice panel (Section 12). Real enforcement lives in firestore.rules.
 
     function logGalleryError(err, context) {
-      var fb = window.NoticeFirebase;
-      var authUser = fb && fb.auth ? fb.auth.currentUser : null;
       console.error('[Admin] Gallery ' + (context || 'operation') + ' failed:', err && err.code, err && err.message);
-      console.error('[Admin] Diagnostic — signedInAdminUid:', signedInAdminUid, '| auth.currentUser:', authUser ? authUser.uid : '(null)', '| Expected UIDs:', fb ? fb.ADMIN_UIDS : '(N/A)');
-      if (err && (err.code === 'permission-denied' || err.code === 'storage/unauthorized')) {
-        console.error('[Admin] CAUSE: Firebase server rejected the write. The security rules deployed on Firebase do NOT allow this UID to write.');
-        console.error('[Admin] FIX: Go to Firebase Console → Firestore Database → Rules tab AND Storage → Rules tab. Paste the full content of firestore.rules and storage.rules respectively. Click Publish on both.');
-        console.error('[Admin] ALSO CHECK: Firebase Console → Authentication → Users tab → verify your admin user has UID ASoDradWjJhgYA7a73q091YOSeY2.');
+      if (err && (err.code === 'HOST_UNREACHABLE' || err.code === 'HOST_UPLOAD_FAILED' || err.code === 'UPLOAD_NOT_CONFIGURED' || err.code === 'INVALID_IMAGE' || err.code === 'IMAGE_TOO_LARGE')) {
+        console.error('[Admin] CAUSE: the external image hosting upload failed (gallery-upload.js → Cloudinary).');
+        console.error('[Admin] FIX: verify the Cloudinary cloud name and unsigned upload preset in gallery-upload.js, that the preset is set to "Unsigned", the image format is allowed, and the network is reachable.');
       }
     }
 
@@ -1189,12 +1173,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleFileSelect(file) {
+      var maxSizeMB = (window.GalleryUpload && GalleryUpload.maxSizeMB) || 10;
       if (!file.type.startsWith('image/')) {
         setGalleryStatus('Please select an image file (JPEG, PNG, GIF, WebP).', true);
         return;
       }
-      if (file.size > 10 * 1024 * 1024) {
-        setGalleryStatus('Image must be under 10 MB.', true);
+      if (file.size > maxSizeMB * 1024 * 1024) {
+        setGalleryStatus('Image must be under ' + maxSizeMB + ' MB.', true);
         return;
       }
       selectedFile = file;
@@ -1246,6 +1231,10 @@ document.addEventListener('DOMContentLoaded', () => {
       gCancelBtn.style.display = 'none';
       switchMode('upload');
     }
+
+    // Expose this to the auth gate (Section 12) so it can reset the form on
+    // sign-in / sign-out. Only set when this Gallery panel exists (admin.html).
+    resetGalleryFormGlobal = resetGalleryForm;
 
     function validateUrlMode() {
       var data = {
@@ -1305,7 +1294,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           GalleryStore.update(editId, result.data).then(function () {
             resetGalleryForm();
-            setGalleryStatus('Image updated. The public Gallery page is in sync.');
+            setGalleryStatus('Image updated in the gallery data. Generate and commit gallery-data.js to publish.');
           }).catch(function (err) {
             logGalleryError(err, 'update');
             setGalleryStatus(GalleryStore.messageFor(err), true);
@@ -1317,7 +1306,7 @@ document.addEventListener('DOMContentLoaded', () => {
           // Editing metadata only (no new file in edit mode)
           GalleryStore.update(editId, metadata).then(function () {
             resetGalleryForm();
-            setGalleryStatus('Image updated. The public Gallery page is in sync.');
+            setGalleryStatus('Image updated in the gallery data. Generate and commit gallery-data.js to publish.');
           }).catch(function (err) {
             logGalleryError(err, 'update-metadata');
             setGalleryStatus(GalleryStore.messageFor(err), true);
@@ -1338,7 +1327,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }).then(function () {
           hideUploadProgress();
           resetGalleryForm();
-          setGalleryStatus('Image uploaded successfully. It is now live on the public Gallery page.');
+          setGalleryStatus('Image uploaded to Cloudinary. Use "Publish to GitHub" below to generate and commit gallery-data.js.');
         }).catch(function (err) {
           hideUploadProgress();
           logGalleryError(err, 'upload');
@@ -1358,7 +1347,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         GalleryStore.add(urlResult.data).then(function () {
           resetGalleryForm();
-          setGalleryStatus('Image added. It is now live on the public Gallery page.');
+          setGalleryStatus('Image added to the gallery data. Use "Publish to GitHub" below to generate and commit gallery-data.js.');
         }).catch(function (err) {
           logGalleryError(err, 'add');
           var msg = GalleryStore.messageFor(err);
@@ -1391,7 +1380,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (gFields.id.value === id) resetGalleryForm();
           e.target.disabled = true;
           GalleryStore.remove(id)
-            .then(() => setGalleryStatus('Image deleted from the gallery.'))
+            .then(() => setGalleryStatus('Image removed from the gallery data. Commit the updated gallery-data.js to hide it on the site. The file may remain in your Cloudinary account.'))
             .catch(err => {
               logGalleryError(err, 'delete');
               setGalleryStatus(GalleryStore.messageFor(err), true);
@@ -1424,32 +1413,109 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    // ── Publish to GitHub: generate/copy/download gallery-data.js ──
+    function setPublishStatus(message, isError) {
+      if (!gDataStatusEl) return;
+      gDataStatusEl.textContent = message || '';
+      gDataStatusEl.classList.toggle('error', !!isError);
+      gDataStatusEl.style.display = message ? 'block' : 'none';
+    }
+
+    function refreshPublishCount() {
+      if (!gDataCount) return;
+      const total = GalleryStore.getAll().length;
+      const skipped = GalleryStore.getDataProblems().length;
+      gDataCount.textContent = total + ' image' + (total === 1 ? '' : 's') +
+        (skipped ? ' (' + skipped + ' invalid skipped — see browser console)' : '');
+      gDataCount.style.display = total > 0 || skipped > 0 ? 'block' : 'none';
+    }
+
+    function generateGalleryData() {
+      if (!gDataGenerate) return;
+      gDataGenerate.disabled = true;
+      setPublishStatus('Generating the updated gallery-data.js\u2026', false);
+      GalleryStore.buildUpdatedFileSource().then(function (code) {
+        if (gDataOutput) {
+          gDataOutput.value = code;
+          gDataOutput.hidden = false;
+        }
+        if (gDataCopy) gDataCopy.disabled = false;
+        if (gDataDownload) gDataDownload.disabled = false;
+        refreshPublishCount();
+        setPublishStatus('Generated. Copy or download the file, then commit it to the GitHub repository — GitHub Pages updates within a minute or two.', false);
+      }).catch(function (err) {
+        setPublishStatus(GalleryStore.messageFor(err), true);
+      }).finally(function () {
+        gDataGenerate.disabled = false;
+      });
+    }
+
+    function copyGalleryData() {
+      if (!gDataOutput || !gDataOutput.value) {
+        setPublishStatus('Click "Generate Gallery Data" first.', true);
+        return;
+      }
+      const text = gDataOutput.value;
+      const done = () => setPublishStatus('Copied to clipboard. Replace gallery-data.js in the repository with this content and commit.', false);
+      const fallbackFailed = () => setPublishStatus('Could not copy automatically. Select the text in the box below and press Ctrl+C.', true);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, () => copyLegacy());
+      } else {
+        copyLegacy();
+      }
+      function copyLegacy() {
+        gDataOutput.focus();
+        gDataOutput.select();
+        try {
+          if (document.execCommand('copy')) done();
+          else fallbackFailed();
+        } catch (e) { fallbackFailed(); }
+      }
+    }
+
+    function downloadGalleryData() {
+      if (!gDataOutput || !gDataOutput.value) {
+        setPublishStatus('Click "Generate Gallery Data" first.', true);
+        return;
+      }
+      const blob = new Blob([gDataOutput.value], { type: 'text/javascript;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'gallery-data.js';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      setPublishStatus('Downloaded gallery-data.js. Replace the file in the repository with this one and commit + push.', false);
+    }
+
+    if (gDataGenerate) gDataGenerate.addEventListener('click', generateGalleryData);
+    if (gDataCopy) gDataCopy.addEventListener('click', copyGalleryData);
+    if (gDataDownload) gDataDownload.addEventListener('click', downloadGalleryData);
+
     function renderGalleryAdminList() {
       const photos = GalleryStore.getAll();
       const editingId = gFields.id.value;
-      const status = GalleryStore.getStatus();
+      const problems = GalleryStore.getDataProblems();
 
       gList.textContent = '';
-      if (status === 'error') {
-        const err = document.createElement('p');
-        err.className = 'no-result';
-        err.textContent = 'Unable to load the gallery right now.';
-        gList.appendChild(err);
-        return;
-      }
-      if (status === 'loading') {
-        const loading = document.createElement('p');
-        loading.className = 'no-result';
-        loading.textContent = 'Loading gallery\u2026';
-        gList.appendChild(loading);
-        return;
-      }
       if (photos.length === 0) {
         const empty = document.createElement('p');
         empty.className = 'no-result';
-        empty.textContent = 'No images yet. Add your first one with the form.';
+        empty.textContent = problems.length
+          ? 'No usable images. The gallery data file contains invalid entries — see the browser console.'
+          : 'No images yet. Add your first one with the form.';
         gList.appendChild(empty);
+        refreshPublishCount();
         return;
+      }
+
+      if (problems.length) {
+        const warn = document.createElement('p');
+        warn.className = 'no-result';
+        warn.textContent = problems.length + ' invalid entry(ies) in the gallery data were skipped (see browser console).';
+        gList.appendChild(warn);
       }
 
       photos.forEach(photo => {
@@ -1481,7 +1547,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const metaBits = [];
         metaBits.push(photo.order === null ? 'No order' : 'Order ' + photo.order);
         if (photo.category) metaBits.push(photo.category.charAt(0).toUpperCase() + photo.category.slice(1));
-        if (photo.storagePath) metaBits.push('Uploaded');
         const metaEl = document.createElement('span');
         metaEl.className = 'admin-item-date';
         metaEl.textContent = metaBits.join(' \u00b7 ');
@@ -1511,6 +1576,7 @@ document.addEventListener('DOMContentLoaded', () => {
         item.appendChild(actions);
         gList.appendChild(item);
       });
+      refreshPublishCount();
     }
 
     renderGalleryAdminList();

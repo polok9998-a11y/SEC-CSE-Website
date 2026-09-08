@@ -18,7 +18,6 @@
 <link rel="stylesheet" href="style1.css">
 <script src="gallery-data.js" defer></script>
 <script src="script.js" defer></script>
-<script type="module" src="firebase-config.js"></script>
 </head>
 <body>
 
@@ -74,9 +73,9 @@
       celebrations and everyday campus life. Click any tile to view it up close.
     </p>
 
-    <!-- Gallery images are rendered by script.js from the shared GalleryStore
-         (gallery-data.js / Firestore "gallery" collection).
-         Add/edit/delete images in admin.html and this grid updates automatically. -->
+    <!-- Gallery images are rendered by script.js from GALLERY_DATA
+         (gallery-data.js). There is no Firebase — the admin edits the data
+         file in admin.html, then commits it to the repository. -->
     <div class="gallery-grid" data-gallery-grid></div>
   </div>
 </div>

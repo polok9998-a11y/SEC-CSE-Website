@@ -1905,3 +1905,41 @@
 
   /* ── URL INPUT HIDDEN BY DEFAULT ── */
   .g-url-input[hidden] { display: none; }
+
+  /* ── GALLERY PUBLISH (gallery-data.js export) ──
+     Minimal additions only — reuses the existing admin card styles. */
+  .g-data-steps {
+    margin: 0 0 14px;
+    padding-left: 22px;
+    font-size: 0.85rem;
+    color: var(--gray-600);
+    line-height: 1.7;
+  }
+
+  .g-data-steps li { margin-bottom: 4px; }
+  .g-data-steps code,
+  .members-intro code {
+    font-family: Consolas, Menlo, monospace;
+    font-size: 0.8em;
+    background: var(--gray-100);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    padding: 0 4px;
+  }
+
+  .g-data-output {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px 14px;
+    font-family: Consolas, Menlo, monospace;
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--heading-text);
+    background: var(--gray-100);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    resize: vertical;
+    white-space: pre;
+    overflow: auto;
+  }

@@ -1,8 +1,17 @@
-# Firebase Setup Guide — Notice & Gallery Systems
+# Firebase Setup Guide — Notice System (the Gallery uses no Firebase)
 
 This guide converts the notice system from browser-local storage to
 **Firebase Firestore**, so that every visitor of the website sees the same
 notices, and only you (the admin) can add/edit/delete them.
+
+> **The photo Gallery no longer uses Firebase at all.** It is fully static:
+>
+> - **Cloudinary** hosts the actual image files (`gallery-upload.js` uploads them),
+> - **`gallery-data.js`** in this repository is the list of Gallery items,
+> - **GitHub Pages** serves the website.
+>
+> The Gallery needs no Firebase project, no Firestore database and no Firebase
+> Storage. The instructions below are only for the **Notice system**.
 
 Follow the steps in order. It takes about 15–20 minutes.
 
@@ -26,6 +35,7 @@ Firestore Security Rules  ──────────────────
 - `notices-data.js` — NoticeStore: same API as before, but backed by Firestore.
 - `firestore.rules` — the actual security boundary (who may read/write).
 - `migrate-notices.html` — ONE-TIME tool to copy your existing 4 notices into Firestore.
+- `gallery-upload.js` + `gallery-data.js` — the **Gallery** (see section R). No Firebase.
 
 > **Security note:** The Firebase Web API key inside `firebase-config.js` is NOT a
 > secret — it only identifies your project. Database protection comes from
@@ -200,39 +210,58 @@ for all visitors.
 
 ---
 
-## R. Gallery system (Firestore "gallery" collection)
+## R. Gallery — Cloudinary + static data (NO Firebase)
 
-The photo gallery works exactly like the notice system and reuses the same
-Firebase project, the same admin account and the same `firebase-config.js` —
-there is no second Firebase initialisation.
+The Gallery is completely independent of Firebase: it uses **Cloudinary** for
+image hosting plus a **static data file** that you commit to the repository.
 
-- **Collection:** `gallery`
-- **Document fields:** `imageUrl` (required), `title`, `caption`,
-  `category` (optional, drives the public filter buttons), `order`
-  (number, smaller shows first), `createdAt`, `updatedAt`.
-- **Public visitors** can only READ gallery images.
-- **Only the admin** can add/update/delete them (enforced by the
-  `match /gallery/{imageId}` block in `firestore.rules`, which uses the same
-  `isAdmin()` check as the notices rules).
+```
+ADMIN PANEL (admin.html)
+   ↓ selects an image
+   ↓ uploads to Cloudinary (gallery-upload.js, unsigned preset — no secret)
+   ↓ gets back a permanent HTTPS image URL
+   ↓ saves the item locally (title, caption, category, order)
+   ↓ "Generate Gallery Data" writes the updated gallery-data.js content
+   ↓ you commit + push the file to the GitHub repository
+GitHub Pages → Public Website (gallery.html renders GALLERY_DATA)
+```
 
-### Required manual step
+- `gallery-upload.js` — uploads images to Cloudinary (cloud name + unsigned
+  upload preset only; **no API secret** anywhere).
+- `gallery-data.js` — the list of Gallery items (`imageUrl`, `title`,
+  `caption`, `category`, `order`, `id`). One entry per photo, all HTTPS URLs.
+- `gallery.html` — renders that file directly. No Firestore, no Storage,
+  no SDK, no network requests to Firebase.
 
-If you deployed the security rules before the gallery existed, re-publish
-`firestore.rules` (Firebase Console → Firestore Database → Rules → paste the
-full file → **Publish**). Without this, the Gallery page shows an error state
-and the admin panel cannot save images.
+### Required manual step — Cloudinary (free account, ~2 minutes)
+
+1. Create a free account at https://cloudinary.com — your **Cloud name** is on
+   the Dashboard.
+2. **Settings → Upload → Add upload preset** with:
+   - "Save mode": **Unsigned** (important — not "Signed"),
+   - Allowed formats: `jpg, png, gif, webp` (recommended),
+   - Folder (optional): e.g. `gallery`.
+3. This repository's `gallery-upload.js` is already configured with the Cloud
+   name and unsigned preset in the `CONFIG` block (lines ~41-42). Only change
+   them if you switch Cloudinary accounts.
 
 ### Managing gallery images
 
 1. Open `admin.html` and sign in with the admin account.
-2. Scroll to **Gallery Management**.
-3. Paste an **Image URL**, add a Title / Caption / Category / Order if you
-   want, click **Add Image** — it appears on the public Gallery instantly
-   (real-time listener).
-4. Use **Edit** to replace a URL or change title/caption/order, and
-   **Delete** to remove an image.
+2. Scroll to **Gallery Management**. Upload a file or paste an image URL, add
+   Title / Caption / Category / Order, click **Add Image**.
+3. Because GitHub Pages is static hosting, the admin page cannot write to the
+   repository by itself. Use the **Publish to GitHub** card:
+   1. **Generate Gallery Data**,
+   2. **Copy** or **Download** the file,
+   3. replace `gallery-data.js` in the repository and **commit + push**,
+   4. GitHub Pages serves the updated Gallery within a minute or two.
+4. **Edit** changes a photo's metadata / URL; **Delete** removes it from the
+   data file (the Cloudinary-hosted file may remain in your Cloudinary account
+   — its server-side delete needs the API secret, so it is never exposed).
 
-You never need to edit HTML to change gallery photos.
+> Nothing about the Gallery needs Firebase. Deleting / extending the gallery
+> never touches `firestore.rules`, the Notice system or Firebase Authentication.
 
 ---
 
@@ -241,7 +270,8 @@ You never need to edit HTML to change gallery photos.
 | Symptom | Likely cause |
 |---|---|
 | "Unable to load notices right now" on public pages | `firebase-config.js` still has placeholders, wrong values, or no internet. Check browser console (F12). |
-| Gallery shows "Unable to load…" or admin image saves fail | The `gallery` rules block was not published yet — see section R. |
+| Gallery page shows no photos | `gallery-data.js` has no usable entries, or its data block has a syntax error after hand-editing. Regenerate it in admin.html → **Publish to GitHub**. |
+| Gallery upload fails | Cloudinary not configured yet (`gallery-upload.js` placeholders), the preset is not "Unsigned", or the image format is not allowed — see section R. |
 | Admin sign-in works but every save fails | `firestore.rules` not published yet, or YOUR_ADMIN_UID still in the rules. |
 | "Not Authorized" card after signing in correctly | Your UID was not put into `ADMIN_UIDS` in `firebase-config.js`. |
 | Nothing happens when opening pages with double-click (`file://`) | Normal. Use GitHub Pages or a local server (`python -m http.server`). |
@@ -257,8 +287,10 @@ You never need to edit HTML to change gallery photos.
 | `firestore.rules` | NEW — Security rules (placeholder `YOUR_ADMIN_UID` inside). |
 | `FIREBASE-SETUP.md` | NEW — This guide. |
 | `migrate-notices.html` | NEW — One-time migration tool for the original 4 notices. |
+| `gallery-upload.js` | NEW — Gallery image hosting: uploads files to Cloudinary with an unsigned preset (no secrets). |
+| `gallery-data.js` | CHANGED — Now a static `GALLERY_DATA` list + a local-only store (no Firestore/Storage). Edited from admin.html; committed to publish. |
 | `notices-data.js` | CHANGED — NoticeStore now reads/writes Firestore instead of localStorage. Same function names (`getAll/add/update/remove/formatDate/onChange`). |
-| `script.js` | CHANGED — Notices render after Firestore data arrives; error/empty states added; Admin Panel is now behind Firebase login. (Also fixed a pre-existing bug where the admin code was nested inside the gallery-filter block.) |
+| `script.js` | CHANGED — Notices render after Firestore data arrives; Admin Panel is behind Firebase login. Gallery now renders the static data file (no Firestore, no Storage) and gains a "Publish to GitHub" (Generate/Copy/Download) card. |
 | `admin.html` | CHANGED — Adds a sign-in card, logout bar and "not authorized" card using the existing styles. |
 | `index.html`, `notice.html` | CHANGED — Only `<script>` include for `firebase-config.js`. No visual changes. |
 | `style1.css` | CHANGED — Small additions only: `[hidden]` helper and `.admin-user-bar` (reuses existing colors/fonts). |

@@ -1,46 +1,113 @@
-// ===== GALLERY STORE =====
-// Single shared source of truth for the photo gallery (public Gallery page
-// and the Gallery Management panel in admin.html).
+// ============================================================
+// GALLERY DATA — STATIC, GitHub Pages friendly
+// ============================================================
+// The photo Gallery is now 100% static. There is NO Firebase
+// Storage and NO Firestore anywhere in this file (or the Gallery):
 //
-// Mirrors NoticeStore (notices-data.js): data lives in Firebase Firestore
-// (collection: "gallery"), every visitor sees the same photos, and a
-// real-time listener (onSnapshot) keeps a local cache up to date.
-// getAll() reads that cache; add/update/remove write through Firestore so
-// security is enforced by firestore.rules on the server.
+//     Cloudinary  = hosts the actual image files (gallery-upload.js)
+//     this file  = the list of Gallery items (image URLs + metadata)
+//     GitHub repo = where this file is committed
+//     GitHub Pages = where the website is served from
 //
-// Document fields:
-//   imageUrl  (string, required) - direct link to the image
+// The public Gallery page (gallery.html) renders the GALLERY_DATA
+// array below through script.js. To change what the site shows:
+//
+//   1. Open admin.html and sign in.
+//   2. Use "Gallery Management" to upload/paste, edit or delete photos.
+//   3. Use the "Publish to GitHub" card to Generate / Copy / Download the
+//      updated gallery-data.js content.
+//   4. Replace this file's data block with the generated one, commit and
+//      push to the repository. GitHub Pages shows the changes within a
+//      minute or two.
+//
+// Do NOT edit this data block by hand unless you know what you are
+// doing — admin.html generates it for you. Every entry has:
+//
+//   id        (string)           - unique, stable identifier
+//   imageUrl  (string, required) - direct HTTPS image link (Cloudinary)
 //   title     (string)           - shown as the tile caption / lightbox title
 //   caption   (string)           - optional extra description
 //   category  (string)           - optional filter group (e.g. "events")
 //   order     (number|null)      - display order (smaller = earlier)
-//   createdAt / updatedAt        - server timestamps
-//
-// This file does NOT initialise Firebase a second time — it reuses the
-// single window.NoticeFirebase instance created by firebase-config.js.
+// ============================================================
+
+// ==== BEGIN GALLERY DATA ====
+// Entries are added/edited/deleted from admin.html → Gallery Management.
+// The block between the two markers below is replaced every time you
+// click "Generate Gallery Data" in the publish card.
+const GALLERY_DATA = [];
+// ==== END GALLERY DATA ====
+
+// ============================================================
+// GALLERY STORE — local-only CRUD + data generation
+// ============================================================
+// Keeps the same public API (getStatus/getAll/add/update/remove/
+// uploadFile/messageFor/onChange) that script.js already uses, but every
+// operation now happens against the in-memory copy of GALLERY_DATA above.
+// Nothing is written anywhere except to this page's memory — publishing
+// happens by committing the generated data file to GitHub.
 
 const GalleryStore = (() => {
   'use strict';
 
   // ── state ────────────────────────────────────────────────────
-  let cache = [];                 // latest snapshot from Firestore
-  let status = 'loading';         // 'loading' | 'ready' | 'error'
-  let unsubscribe = null;
+  let items;                              // working copy of GALLERY_DATA
+  const dataProblems = [];                // invalid entries found in the data file
   const changeListeners = [];
-  const statusListeners = [];
   let started = false;
 
-  let readyResolve = null;
-  let readyReject = null;
-  const readyPromise = new Promise((resolve, reject) => {
-    readyResolve = resolve;
-    readyReject = reject;
-  });
+  const UPLOAD_NOT_CONFIGURED_MESSAGE =
+    'Image upload is not configured yet. Open gallery-upload.js and add your ' +
+    'Cloudinary cloud name and unsigned upload preset, then redeploy.';
 
-  function setStatus(next) {
-    if (status === next) return;
-    status = next;
-    statusListeners.forEach(fn => fn(status));
+  // ── helpers ──────────────────────────────────────────────────
+  function newId() {
+    return 'img-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+  }
+
+  function normalizeOrder(value) {
+    if (value === null || value === undefined || String(value).trim() === '') return null;
+    const n = Number(value);
+    return isFinite(n) ? n : null;
+  }
+
+  // Validates one entry from the data file. Returns a clean entry or null.
+  function normalizeEntry(raw, index) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const imageUrl = typeof raw.imageUrl === 'string' ? raw.imageUrl.trim() : '';
+    if (!imageUrl) return null;
+    if (!/^https?:\/\//i.test(imageUrl)) return null;
+    return {
+      id: (typeof raw.id === 'string' && raw.id.trim()) ? raw.id.trim() : newId(),
+      imageUrl: imageUrl,
+      title: typeof raw.title === 'string' ? raw.title.trim() : '',
+      caption: typeof raw.caption === 'string' ? raw.caption.trim() : '',
+      category: typeof raw.category === 'string' ? raw.category.trim().toLowerCase() : '',
+      order: normalizeOrder(raw.order)
+    };
+  }
+
+  // Scans the GALLERY_DATA literal once at startup; keeps only valid
+  // entries and records a helpful warning for anything it skipped.
+  function scanInitialData() {
+    const seen = new Set();
+    const valid = [];
+    GALLERY_DATA.forEach((raw, i) => {
+      const entry = normalizeEntry(raw, i);
+      if (!entry) {
+        dataProblems.push('Entry #' + (i + 1) + ' skipped — imageUrl must be a valid http(s) URL. ' +
+          (raw && raw.imageUrl ? 'Found: "' + String(raw.imageUrl).slice(0, 60) + '"' : 'none given.'));
+        return;
+      }
+      if (seen.has(entry.id)) {
+        const previousId = entry.id;
+        entry.id = newId();
+        console.warn('[Gallery] Entry #' + (i + 1) + ' had a duplicated id ("' + previousId + '") and was assigned a new one (' + entry.id + ').');
+      }
+      seen.add(entry.id);
+      valid.push(entry);
+    });
+    items = valid;
   }
 
   function emitChange() {
@@ -48,30 +115,8 @@ const GalleryStore = (() => {
     document.dispatchEvent(new CustomEvent('gallery:changed'));
   }
 
-  // Firestore doc -> plain object used across the site.
-  function toPlain(docSnap) {
-    const d = docSnap.data() || {};
-    let order = null;
-    if (typeof d.order === 'number' && isFinite(d.order)) {
-      order = d.order;
-    } else if (typeof d.order === 'string' && d.order.trim() !== '' && !isNaN(parseInt(d.order, 10))) {
-      order = parseInt(d.order, 10);
-    }
-    return {
-      id: docSnap.id,
-      imageUrl: typeof d.imageUrl === 'string' ? d.imageUrl.trim() : '',
-      title: typeof d.title === 'string' ? d.title.trim() : '',
-      caption: typeof d.caption === 'string' ? d.caption.trim() : '',
-      category: typeof d.category === 'string' ? d.category.trim().toLowerCase() : '',
-      order: order,
-      storagePath: typeof d.storagePath === 'string' ? d.storagePath.trim() : '',
-      createdAt: d.createdAt || null,
-      updatedAt: d.updatedAt || null
-    };
-  }
-
   // Display order: by "order" ascending (missing goes last),
-  // ties broken alphabetically by document id for stability.
+  // ties broken alphabetically by id for stability.
   function sortByOrder(list) {
     const MISSING = Number.MAX_SAFE_INTEGER;
     return list.slice().sort((a, b) => {
@@ -82,345 +127,192 @@ const GalleryStore = (() => {
     });
   }
 
-  // ── Firebase access ─────────────────────────────────────────
-  // Same handshake as notices-data.js: firebase-config.js loads
-  // asynchronously and announces itself with window.NoticeFirebase.
-  function whenFirebase(timeoutMs) {
-    return new Promise((resolve, reject) => {
-      const fb = window.NoticeFirebase;
-      if (fb && fb.ready) { resolve(fb); return; }
-      if (fb && fb.ready === false) { reject(new Error(fb.error || 'Firebase is not configured.')); return; }
-
-      let done = false;
-      const ok = () => { if (!done) { done = true; cleanup(); resolve(window.NoticeFirebase); } };
-      const bad = () => {
-        if (done) return;
-        done = true; cleanup();
-        const msg = (window.NoticeFirebase && window.NoticeFirebase.error) ||
-          'Could not connect to the gallery service.';
-        reject(new Error(msg));
-      };
-      const timer = setTimeout(bad, timeoutMs || 15000);
-      function cleanup() { clearTimeout(timer); }
-
-      document.addEventListener('noticefirebase:ready', ok);
-      document.addEventListener('noticefirebase:failed', bad);
-    });
+  function requireHost() {
+    const host = window.GalleryUpload;
+    if (!host || typeof host.uploadFile !== 'function') return null;
+    return host;
   }
 
-  function start(fb) {
-    if (unsubscribe) unsubscribe();
-    const colRef = fb.fs.collection(fb.db, fb.GALLERY_COLLECTION);
-
-    unsubscribe = fb.fs.onSnapshot(colRef,
-      snapshot => {
-        cache = snapshot.docs.map(toPlain);
-        setStatus('ready');
-        readyResolve();
-        emitChange();            // re-render the gallery instantly (real time)
-      },
-      err => {
-        console.warn('[Gallery] Firestore read failed:', err && err.code, err && err.message);
-        cache = [];
-        setStatus('error');
-        readyReject(err);
-        emitChange();
-      }
-    );
-  }
-
-  function ensureStarted() {
-    if (started) return readyPromise;
-    started = true;
-    whenFirebase()
-      .then(start)
-      .catch(err => {
-        console.warn('[Gallery]', err && err.message);
-        setStatus('error');
-        readyReject(err);
-        emitChange();
-      });
-
-    // Safety net: stop showing "loading" if the SDK never answers.
-    setTimeout(() => {
-      if (status === 'loading') {
-        setStatus('error');
-        readyReject(new Error('Connection timed out.'));
-        emitChange();
-      }
-    }, 20000);
-
-    return readyPromise;
-  }
-
-  function requireFb() {
-    const fb = window.NoticeFirebase;
-    if (!fb || !fb.ready) throw new Error('FIREBASE_UNAVAILABLE');
-    return fb;
-  }
-
-  function requireAdminAuth(fb, context) {
-    var user = fb.auth.currentUser;
-    var uid = user ? user.uid : null;
-    var expected = fb.ADMIN_UIDS;
-    var match = uid ? expected.indexOf(uid) !== -1 : false;
-    console.log('[Gallery] Pre-write auth check (' + (context || 'write') + ') — currentUser:', uid || '(null)', '| Expected admin UIDs:', expected, '| Match:', match);
-    if (!user) {
-      console.warn('[Gallery] WARNING: fb.auth.currentUser is null. The Firestore/Storage operation will use an UNAUTHENTICATED token, which will be rejected by isAdmin() rules. Ensure Firebase Auth is initialised and the user is signed in before performing this operation.');
-      console.warn('[Gallery] Auth instance:', fb.auth ? 'OK' : 'MISSING', '| Firestore instance:', fb.db ? 'OK' : 'MISSING', '| Storage instance:', fb.storage ? 'OK' : 'MISSING');
-    } else if (!match) {
-      console.warn('[Gallery] WARNING: currentUser UID', uid, 'does NOT match any expected admin UID:', expected, '. The operation will be rejected by Firestore/Storage security rules.');
-    } else {
-      console.log('[Gallery] Auth OK — UID', uid, 'is an authorized admin. Operation:', context || 'write');
-    }
-  }
-
-  function normalizeOrder(value) {
-    if (value === null || value === undefined || String(value).trim() === '') return null;
-    const n = Number(value);
-    return isFinite(n) ? n : null;
-  }
-
-  // Generate a unique filename for uploaded files.
-  function uniqueFilename(originalName) {
-    const ext = originalName.includes('.') ? originalName.split('.').pop() : 'jpg';
-    const ts = Date.now();
-    const rand = Math.random().toString(36).slice(2, 8);
-    return ts + '-' + rand + '.' + ext;
-  }
-
-  // Delete a Storage file given its storagePath (best-effort, ignores errors).
-  function deleteStorageFile(fb, path) {
-    if (!path) return Promise.resolve();
-    try {
-      const fileRef = fb.st.ref(fb.storage, path);
-      return fb.st.deleteObject(fileRef).catch(function (delErr) {
-        console.warn('[Gallery] Storage delete ignored error (file may already be gone):', delErr && delErr.code, delErr && delErr.message);
-      });
-    } catch (e) {
-      console.warn('[Gallery] Storage delete threw synchronously:', e && e.message);
-      return Promise.resolve();
-    }
+  function cleanChanges(changes) {
+    const clean = {};
+    if ('imageUrl' in changes) clean.imageUrl = String(changes.imageUrl || '').trim();
+    if ('title' in changes) clean.title = String(changes.title || '').trim();
+    if ('caption' in changes) clean.caption = String(changes.caption || '').trim();
+    if ('category' in changes) clean.category = String(changes.category || '').trim().toLowerCase();
+    if ('order' in changes) clean.order = normalizeOrder(changes.order);
+    return clean;
   }
 
   function friendly(err) {
-    if (err && err.message === 'FIREBASE_UNAVAILABLE') {
-      return 'Cannot reach the gallery service right now. Please try again later.';
+    if (!err) return 'The gallery action could not be completed. Please try again.';
+    const code = err.code || err.message || '';
+    if (code === 'UPLOAD_NOT_CONFIGURED') return UPLOAD_NOT_CONFIGURED_MESSAGE;
+    if (code === 'IMAGE_URL_REQUIRED') return 'Please enter a valid image URL.';
+    if (code === 'INVALID_IMAGE' || (typeof err.message === 'string' && err.message.indexOf('Please select an image') !== -1)) {
+      return 'Please select an image file (JPEG, PNG, GIF, WebP).';
     }
-    if (err && err.message && err.message.indexOf('Please select an image') !== -1) {
-      return err.message;
+    if (code === 'IMAGE_TOO_LARGE' || (typeof err.message === 'string' && err.message.indexOf('must be under') !== -1)) {
+      const host = requireHost();
+      return 'Image must be under ' + (host && host.maxSizeMB ? host.maxSizeMB : 10) + ' MB.';
     }
-    if (err && err.message && err.message.indexOf('under 10 MB') !== -1) {
-      return err.message;
+    if (code === 'HOST_UNREACHABLE') return 'Could not reach the image hosting service. Check your internet connection and try again.';
+    if (code === 'HOST_UPLOAD_FAILED') {
+      return typeof err.message === 'string' && err.message.indexOf('rejected') !== -1
+        ? err.message
+        : 'The image hosting service rejected the upload. Check that the upload preset is "Unsigned", the image format is allowed, and your connection is working.';
     }
-    if (err && err.message === 'IMAGE_URL_REQUIRED') {
-      return 'Please enter an image URL.';
-    }
-    const code = err && err.code;
-    if (code === 'permission-denied') return 'You are not allowed to do that. Sign in as the admin first.';
-    if (code === 'unavailable' || code === 'network-request-failed') return 'Network problem. Check your internet connection and try again.';
-    if (code === 'storage/unauthorized') return 'You are not authorized to upload files. Sign in as the admin first.';
-    if (code === 'storage/canceled') return 'Upload was canceled.';
-    if (code === 'storage/quota-exceeded') return 'Storage quota exceeded. Please contact support.';
-    if (code === 'storage/object-not-found') return 'The file was not found on the server. It may have been deleted.';
-    if (code === 'storage/retry-limit-exceeded') return 'Too many upload attempts. Please try again later.';
-    if (code === 'failed-precondition') return 'Operation failed. The file may have been modified by another session.';
-    return 'Something went wrong. Please try again.';
+    if (code === 'NO_GALLERY_ITEM') return 'That gallery item no longer exists in the local gallery data.';
+    return 'The gallery action could not be completed (' + code + '). Check the browser console for details.';
+  }
+
+  // ── formatters for the generated data file ───────────────────
+  function formatEntry(entry) {
+    return '  {\n' +
+      '    id: ' + JSON.stringify(String(entry.id)) + ',\n' +
+      '    imageUrl: ' + JSON.stringify(entry.imageUrl) + ',\n' +
+      '    title: ' + JSON.stringify(entry.title) + ',\n' +
+      '    caption: ' + JSON.stringify(entry.caption) + ',\n' +
+      '    category: ' + JSON.stringify(entry.category) + ',\n' +
+      '    order: ' + (entry.order === null || entry.order === undefined ? 'null' : entry.order) + '\n' +
+      '  }';
+  }
+
+  // The exact data block that must replace the block between the
+  // BEGIN/END GALLERY DATA markers in gallery-data.js.
+  function generateDataBlock() {
+    const entries = sortByOrder(items).map(formatEntry).join(',\n');
+    return '// ==== BEGIN GALLERY DATA ====\n' +
+      'const GALLERY_DATA = [\n' +
+      (entries ? entries + '\n' : '') +
+      '];\n' +
+      '// ==== END GALLERY DATA ====';
+  }
+
+  // Preferred: rebuild the WHOLE gallery-data.js file by swapping just the
+  // data block in the file currently served. Falls back to the data block
+  // alone when the file cannot be fetched (e.g. file:// protocol).
+  function buildUpdatedFileSource() {
+    const block = this.generateDataBlock();
+    return fetch('gallery-data.js', { cache: 'no-store' })
+      .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.text(); })
+      .then(function (code) {
+        const startMark = '// ==== BEGIN GALLERY DATA ====';
+        const endMark = '// ==== END GALLERY DATA ====';
+        const start = code.indexOf(startMark);
+        const end = code.indexOf(endMark);
+        if (start !== -1 && end !== -1) {
+          const endPos = end + endMark.length;
+          return code.slice(0, start) + block + code.slice(endPos);
+        }
+        return '// ============================================================\n' +
+          '// gallery-data.js — regenerated block\n' +
+          '// The BEGIN/END GALLERY DATA markers were not found in the current\n' +
+          '// file, so this is the full new data block. Replace the old\n' +
+          '// GALLERY_DATA declaration with the block below.\n' +
+          '// ============================================================\n\n' + block;
+      })
+      .catch(function () {
+        return '// Could not read the current gallery-data.js (this needs the site to be\n' +
+          '// served over HTTP, e.g. GitHub Pages or a local server).\n' +
+          '// Replace the GALLERY_DATA block in gallery-data.js with this one and commit.\n\n' + block;
+      });
   }
 
   // ── public API ──────────────────────────────────────────────
   const store = {
 
-    // Resolves on the first successful read from Firestore.
-    ready() { ensureStarted(); return readyPromise; },
+    // Static data source: always instantly ready (no network).
+    ready() { return Promise.resolve(); },
 
-    getStatus() { return status; },
+    getStatus() { return 'ready'; },
 
-    onStatusChange(fn) { statusListeners.push(fn); },
+    // Human-readable notes about invalid entries found in the data file.
+    getDataProblems() { return dataProblems.slice(); },
 
-    // Re-connect after an error (also fired by the browser "online" event).
-    retry() {
-      if (status !== 'error') return;
-      started = false;
-      ensureStarted();
-    },
+    // All images in display order.
+    getAll() { return sortByOrder(items); },
 
-    // All images in display order (reads the live Firestore cache).
-    getAll() {
-      return sortByOrder(cache);
-    },
-
-    // Add an image. Returns a Promise. Firestore generates the doc ID.
+    // Add an image (paste-URL path). Returns a Promise resolving with the saved record.
     add(data) {
-      let fb;
-      try { fb = requireFb(); } catch (e) { return Promise.reject(e); }
-      requireAdminAuth(fb, 'add');
-      const record = {
-        imageUrl: String(data.imageUrl || '').trim(),
-        title: String(data.title || '').trim(),
-        caption: String(data.caption || '').trim(),
-        category: String(data.category || '').trim().toLowerCase(),
-        order: normalizeOrder(data.order)
-      };
-      if (!record.imageUrl) return Promise.reject(new Error('IMAGE_URL_REQUIRED'));
-
-      // Two-argument doc() creates a reference with an auto-generated ID,
-      // then setDoc writes it — no extra SDK functions needed.
-      const ref = fb.fs.doc(fb.db, fb.GALLERY_COLLECTION);
-      return fb.fs.setDoc(ref, Object.assign({}, record, {
-        createdAt: fb.fs.serverTimestamp(),
-        updatedAt: fb.fs.serverTimestamp()
-      })).then(() => {
-        var saved = Object.assign({ id: ref.id }, record);
-        console.log('[Gallery] Firestore write OK — doc ID:', ref.id, '| category:', record.category || '(none)', '| imageUrl:', record.imageUrl.substring(0, 80));
-        return saved;
-      }).catch(function (err) {
-        console.error('[Gallery] Firestore write FAILED — error:', err && err.code, err && err.message);
-        throw err;
-      });
+      if (!started) return Promise.reject(new Error('The gallery is not initialised yet.'));
+      const entry = normalizeEntry(Object.assign({}, data, { id: newId() }));
+      if (!entry) return Promise.reject(new Error('IMAGE_URL_REQUIRED'));
+      items.push(entry);
+      emitChange();
+      return Promise.resolve(entry);
     },
 
-    // Update an existing image by document ID. Returns a Promise.
+    // Update metadata of an existing item by id. Returns a Promise.
     update(id, changes) {
-      let fb;
-      try { fb = requireFb(); } catch (e) { return Promise.reject(e); }
-      requireAdminAuth(fb, 'update');
-      const clean = {};
-      if ('imageUrl' in changes) clean.imageUrl = String(changes.imageUrl || '').trim();
-      if ('title' in changes) clean.title = String(changes.title || '').trim();
-      if ('caption' in changes) clean.caption = String(changes.caption || '').trim();
-      if ('category' in changes) clean.category = String(changes.category || '').trim().toLowerCase();
-      if ('order' in changes) clean.order = normalizeOrder(changes.order);
-      if ('imageUrl' in clean && !clean.imageUrl) return Promise.reject(new Error('IMAGE_URL_REQUIRED'));
-      const ref = fb.fs.doc(fb.db, fb.GALLERY_COLLECTION, String(id));
-      return fb.fs.updateDoc(ref, Object.assign({}, clean, { updatedAt: fb.fs.serverTimestamp() }))
-        .then(function () {
-          console.log('[Gallery] Firestore update OK — doc ID:', id, '| changed fields:', Object.keys(clean).join(', ') || '(none)');
-          return Object.assign({}, cache.find(p => p.id === id) || {}, clean);
-        })
-        .catch(function (err) {
-          console.error('[Gallery] Firestore update FAILED — doc ID:', id, '| error:', err && err.code, err && err.message);
-          throw err;
-        });
+      if (!started) return Promise.reject(new Error('The gallery is not initialised yet.'));
+      const index = items.findIndex(p => p.id === String(id));
+      if (index === -1) return Promise.reject(new Error('NO_GALLERY_ITEM'));
+      const current = items[index];
+      const clean = cleanChanges(changes);
+      if ('imageUrl' in clean) {
+        if (!clean.imageUrl || !/^https?:\/\//i.test(clean.imageUrl)) return Promise.reject(new Error('IMAGE_URL_REQUIRED'));
+      }
+      const updated = Object.assign({}, current, clean, { id: current.id });
+      items[index] = updated;
+      emitChange();
+      return Promise.resolve(updated);
     },
 
-    // Delete an image by document ID. Also removes the Storage file
-    // if the image was uploaded (has a storagePath). Returns a Promise.
+    // Remove an item by id. Returns a Promise.
+    // The Cloudinary-hosted file cannot be removed from a static page (its
+    // delete API needs the API secret), so it may stay in the Cloudinary
+    // account — it is simply no longer referenced by the Gallery.
     remove(id) {
-      let fb;
-      try { fb = requireFb(); } catch (e) { return Promise.reject(e); }
-      requireAdminAuth(fb, 'delete');
-      // Find the storagePath before deleting the Firestore doc.
-      const existing = cache.find(p => p.id === id);
-      const storagePath = existing ? existing.storagePath : '';
-      console.log('[Gallery] Deleting doc ID:', id, '| storagePath:', storagePath || '(none — URL-only image)');
-      const ref = fb.fs.doc(fb.db, fb.GALLERY_COLLECTION, String(id));
-      return fb.fs.deleteDoc(ref).then(function () {
-        console.log('[Gallery] Firestore delete OK — doc ID:', id);
-        if (storagePath) {
-          console.log('[Gallery] Deleting Storage file:', storagePath);
-        }
-        return deleteStorageFile(fb, storagePath);
-      }).then(function () {
-        if (storagePath) {
-          console.log('[Gallery] Storage delete OK (or file was already gone) — path:', storagePath);
-        }
-      }).catch(function (err) {
-        console.error('[Gallery] Delete FAILED — doc ID:', id, '| error:', err && err.code, err && err.message);
-        throw err;
-      });
+      if (!started) return Promise.reject(new Error('The gallery is not initialised yet.'));
+      const before = items.length;
+      items = items.filter(p => p.id !== String(id));
+      if (items.length === before) return Promise.reject(new Error('NO_GALLERY_ITEM'));
+      emitChange();
+      return Promise.resolve();
     },
 
-    // Upload an image file to Firebase Storage, then save metadata to Firestore.
-    // file: a File object from an <input type="file">
-    // metadata: { title, caption, category, order }
-    // onProgress: optional callback({ bytesTransferred, totalBytes })
-    // Returns a Promise that resolves with the saved record.
+    // Upload an image file to Cloudinary (gallery-upload.js) and add the
+    // returned HTTPS URL + metadata to the local gallery data. Returns a
+    // Promise resolving with the saved record. No Firebase involved.
     uploadFile(file, metadata, onProgress) {
-      let fb;
-      try { fb = requireFb(); } catch (e) { return Promise.reject(e); }
-      requireAdminAuth(fb, 'upload');
-      if (!file || !file.type || !file.type.startsWith('image/')) {
-        return Promise.reject(new Error('Please select an image file (JPEG, PNG, GIF, WebP).'));
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        return Promise.reject(new Error('Image must be under 10 MB.'));
-      }
-
-      const filename = uniqueFilename(file.name);
-      const path = fb.GALLERY_STORAGE_PATH + '/' + filename;
-      const fileRef = fb.st.ref(fb.storage, path);
-
-      console.log('[Gallery] Starting upload — filename:', filename, '| storagePath:', path, '| size:', file.size, 'bytes | type:', file.type);
-
-      return new Promise(function (resolve, reject) {
-        const uploadTask = fb.st.uploadBytesResumable(fileRef, file, {
-          contentType: file.type
-        });
-
-        uploadTask.on('state_changed',
-          // Progress handler — called repeatedly during upload
-          function (snapshot) {
-            if (onProgress) {
-              onProgress({ bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
-            }
-          },
-          // Error handler — called if the upload fails
-          function (error) {
-            console.error('[Gallery] Upload FAILED — error:', error && error.code, error && error.message);
-            reject(error);
-          },
-          // Complete handler — called when upload finishes successfully
-          function () {
-            console.log('[Gallery] Storage upload OK — bytes:', file.size);
-            if (onProgress) {
-              onProgress({ bytesTransferred: file.size, totalBytes: file.size });
-            }
-            fb.st.getDownloadURL(uploadTask.snapshot.ref).then(function (downloadURL) {
-              console.log('[Gallery] Download URL obtained:', downloadURL ? downloadURL.substring(0, 80) + '...' : '(empty)');
-              const record = {
-                imageUrl: downloadURL,
-                title: String(metadata.title || '').trim(),
-                caption: String(metadata.caption || '').trim(),
-                category: String(metadata.category || '').trim().toLowerCase(),
-                order: normalizeOrder(metadata.order),
-                storagePath: path
-              };
-              const docRef = fb.fs.doc(fb.db, fb.GALLERY_COLLECTION);
-              return fb.fs.setDoc(docRef, Object.assign({}, record, {
-                createdAt: fb.fs.serverTimestamp(),
-                updatedAt: fb.fs.serverTimestamp()
-              })).then(function () {
-                var saved = Object.assign({ id: docRef.id }, record);
-                console.log('[Gallery] Firestore write OK after upload — doc ID:', docRef.id, '| category:', record.category || '(none)');
-                resolve(saved);
-              });
-            }).catch(function (err) {
-              console.error('[Gallery] Post-upload FAILED — error:', err && err.code, err && err.message);
-              // Clean up the Storage file if Firestore save failed.
-              deleteStorageFile(fb, path);
-              reject(err);
-            });
-          }
-        );
+      if (!started) return Promise.reject(new Error('The gallery is not initialised yet.'));
+      const host = requireHost();
+      if (!host) return Promise.reject(new Error('UPLOAD_NOT_CONFIGURED'));
+      return host.uploadFile(file, onProgress).then(result => {
+        if (!result || !result.publicUrl) throw new Error('IMAGE_URL_REQUIRED');
+        return store.add(Object.assign({}, metadata || {}, { imageUrl: result.publicUrl }));
+      }).catch(err => {
+        console.error('[Gallery] Upload FAILED — code:', err && err.code, '| message:', err && err.message);
+        throw err;
       });
     },
 
     // Human-friendly message for a rejected CRUD promise.
     messageFor(err) { return friendly(err); },
 
-    // Re-render callback: fires after every Firestore change, in every
-    // open tab/page at the same time (real-time listeners).
+    // Re-render callback: fires after every local change in this page.
     onChange(fn) {
       changeListeners.push(fn);
-    }
+    },
+
+    // Number of images currently in the working data.
+    count() { return items.length; },
+
+    // Exact data block (usable on its own for copy/paste).
+    generateDataBlock,
+
+    // Full updated gallery-data.js file content (uses the file currently served).
+    buildUpdatedFileSource
   };
 
-  // Start listening as soon as this file runs.
-  ensureStarted();
-
-  // Auto-retry once the network comes back.
-  window.addEventListener('online', () => store.retry());
+  if (!started) {
+    started = true;
+    scanInitialData();
+    if (dataProblems.length) {
+      console.warn('[Gallery] ' + dataProblems.length + ' invalid entr' + (dataProblems.length === 1 ? 'y was' : 'ies were') + ' found in GALLERY_DATA and skipped:');
+      dataProblems.forEach(p => console.warn('[Gallery]   - ' + p));
+    }
+  }
 
   // Expose globally (a top-level "const" alone would not create
   // window.GalleryStore, which script.js checks for).

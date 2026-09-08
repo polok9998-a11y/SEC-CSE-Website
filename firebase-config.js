@@ -105,21 +105,18 @@ console.log('[Firebase] Project:', firebaseConfig.projectId, '| Expected admin U
   Promise.all([
     import(SDK + "/firebase-app.js"),
     import(SDK + "/firebase-firestore.js"),
-    import(SDK + "/firebase-auth.js"),
-    import(SDK + "/firebase-storage.js")
+    import(SDK + "/firebase-auth.js")
   ]).then(modules => {
     const app = modules[0];
     const fs = modules[1];
     const authMod = modules[2];
-    const storageMod = modules[3];
 
     const firebaseApp = app.initializeApp(firebaseConfig);
     const db = fs.getFirestore(firebaseApp);
     const auth = authMod.getAuth(firebaseApp);
-    const storage = storageMod.getStorage(firebaseApp);
 
     console.log('[Firebase] App initialised — project:', firebaseConfig.projectId);
-    console.log('[Firebase] Auth instance:', auth ? 'OK' : 'MISSING', '| Firestore instance:', db ? 'OK' : 'MISSING', '| Storage instance:', storage ? 'OK' : 'MISSING');
+    console.log('[Firebase] Auth instance:', auth ? 'OK' : 'MISSING', '| Firestore instance:', db ? 'OK' : 'MISSING');
     console.log('[Firebase] Auth currentUser on init:', auth.currentUser ? auth.currentUser.uid : '(null — will resolve asynchronously)');
 
     // Listen for auth changes to log runtime UID
@@ -140,13 +137,10 @@ console.log('[Firebase] Project:', firebaseConfig.projectId, '| Expected admin U
       app: firebaseApp,
       db: db,
       auth: auth,
-      storage: storage,
 
       // Config
       ADMIN_UIDS: ADMIN_UIDS.filter(uid => !PLACEHOLDER_VALUES.includes(uid)),
       COLLECTION: "notices",
-      GALLERY_COLLECTION: "gallery",
-      GALLERY_STORAGE_PATH: "gallery/images",
 
       // Firestore helpers used by notices-data.js
       fs: {
@@ -159,15 +153,6 @@ console.log('[Firebase] Project:', firebaseConfig.projectId, '| Expected admin U
         deleteDoc: fs.deleteDoc,
         onSnapshot: fs.onSnapshot,
         serverTimestamp: fs.serverTimestamp
-      },
-
-      // Storage helpers used by gallery-data.js
-      st: {
-        ref: storageMod.ref,
-        uploadBytes: storageMod.uploadBytes,
-        uploadBytesResumable: storageMod.uploadBytesResumable,
-        getDownloadURL: storageMod.getDownloadURL,
-        deleteObject: storageMod.deleteObject
       },
 
       // Auth helpers used by the Admin Panel

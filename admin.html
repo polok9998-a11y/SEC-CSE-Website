@@ -17,6 +17,7 @@
 <style>html.dark-mode{background:#0d1320}</style>
 <link rel="stylesheet" href="style1.css">
 <script src="notices-data.js" defer></script>
+<script src="gallery-upload.js" defer></script>
 <script src="gallery-data.js" defer></script>
 <script src="script.js" defer></script>
 <script type="module" src="firebase-config.js"></script>
@@ -182,9 +183,11 @@
       </div>
 
       <p class="members-intro">
-        Add, edit or delete gallery images here &mdash; the public Gallery page
-        updates automatically from the same shared data. You can upload an image
-        file directly or paste an external image URL.
+        Add, edit or delete gallery images here. The Gallery no longer uses
+        Firebase Storage or Firestore &mdash; changes are saved into the static
+        <code>gallery-data.js</code> file shown in the list below. After making
+        changes, use the <strong>Publish to GitHub</strong> card further down to
+        generate the updated data file and commit it to the repository.
       </p>
 
       <div class="admin-grid">
@@ -275,6 +278,38 @@
         <div class="admin-card">
           <h4>Current Gallery Images</h4>
           <div id="gallery-admin-list"></div>
+        </div>
+
+      <!-- PUBLISH TO GITHUB — the static gallery-data.js export -->
+        <div class="admin-grid">
+          <div class="admin-card">
+            <h4>Publish to GitHub (gallery-data.js)</h4>
+
+            <p class="members-intro">
+              GitHub Pages is static hosting, so this page cannot write to the
+              repository by itself (that would require a secret GitHub token,
+              which is never safe in a browser). Instead, this panel generates
+              the exact updated <code>gallery-data.js</code> file for you:
+            </p>
+
+            <ol class="g-data-steps">
+              <li>Click <strong>Generate Gallery Data</strong>.</li>
+              <li><strong>Copy</strong> or <strong>Download</strong> the file.</li>
+              <li>Replace <code>gallery-data.js</code> in the repository and commit + push (or use GitHub&rsquo;s &ldquo;Upload files&rdquo; button).</li>
+              <li>GitHub Pages publishes the new Gallery within a minute or two.</li>
+            </ol>
+
+            <p id="g-data-count" class="admin-status" role="status" aria-live="polite"></p>
+            <p id="g-data-status" class="admin-status" role="status" aria-live="polite"></p>
+
+            <div class="admin-actions">
+              <button type="button" class="btn btn-gold" id="g-data-generate">Generate Gallery Data</button>
+              <button type="button" class="btn btn-outline" id="g-data-copy" disabled>Copy</button>
+              <button type="button" class="btn btn-outline" id="g-data-download" disabled>Download gallery-data.js</button>
+            </div>
+
+            <textarea id="g-data-output" class="g-data-output" readonly rows="14" spellcheck="false" hidden></textarea>
+          </div>
         </div>
 
       </div>
